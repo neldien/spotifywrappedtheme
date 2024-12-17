@@ -2,7 +2,6 @@ const videoQueue = require('./queue');
 const axios = require('axios');
 require('dotenv').config();
 
-// Clean the endpoint URL
 const MODEL_ENDPOINT = process.env.MODEL_ENDPOINT?.replace(/['"]/g, '');
 
 console.log('Video generation worker started with config:', {
@@ -16,40 +15,36 @@ videoQueue.process(async (job) => {
     });
     
     try {
-        if (!process.env.DEEPINFRA_API_KEY) {
-            throw new Error('DEEPINFRA_API_KEY not configured');
-        }
-
-        if (!MODEL_ENDPOINT) {
-            throw new Error('MODEL_ENDPOINT not configured');
-        }
-
+        // Using their default values from the API docs
         const payload = {
             prompt: job.data.prompt,
-            width: 1280,
-            height: 720,
-            duration: 5.1,
-            num_inference_steps: 128,
-            cfg_scale: 5,
-            seed: 12345,
+            width: 848,          // Default from docs
+            height: 480,         // Default from docs
+            duration: 5.1,       // Default from docs (max)
+            num_inference_steps: 100,  // Default from docs
+            cfg_scale: 4.5,      // Default from docs
+            seed: 12345          // Optional
         };
 
-        console.log(`Making API request for job ${job.id} to ${MODEL_ENDPOINT}`);
+        console.log(`Making API request for job ${job.id}`, {
+            endpoint: MODEL_ENDPOINT,
+            payloadLength: JSON.stringify(payload).length
+        });
 
         const response = await axios.post(
             MODEL_ENDPOINT,
             payload,
             {
                 headers: {
-                    Authorization: `Bearer ${process.env.DEEPINFRA_API_KEY}`,
-                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.DEEPINFRA_API_KEY}`,
+                    'Content-Type': 'application/json'
                 }
             }
         );
 
         console.log(`API response for job ${job.id}:`, {
             status: response.status,
-            hasVideoUrl: !!response.data.video_url
+            data: response.data
         });
 
         if (!response.data.video_url) {
@@ -61,8 +56,7 @@ videoQueue.process(async (job) => {
         console.error(`Job ${job.id} failed:`, {
             message: error.message,
             response: error.response?.data,
-            status: error.response?.status,
-            stack: error.stack
+            status: error.response?.status
         });
         throw error;
     }
