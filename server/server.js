@@ -19,7 +19,19 @@ const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
 
-app.use(cors());
+const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:3000'];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: 'GET,POST,OPTIONS',
+    allowedHeaders: 'Content-Type,Authorization'
+}));
 app.use(express.json());
 
 // Serve the React build from the client folder
@@ -175,6 +187,7 @@ app.post('/generate-video-prompt', async (req, res) => {
             Transform the following music summary into a video creation prompt: "${musicSummary}"
             ${imageDescription ? `Additionally, incorporate the following visual descriptions to be the main characters in the prompt: "${imageDescription}".` : ''}
             Follow these guidelines:
+            - the people in the image description are the subjects of the scene. make sure theyre in it.
             - Describe a vivid visual scene (e.g., location, time of day, lighting, colors).
             - Include movement or dynamic actions.
             - Add specific cinematic details like camera angles, textures, and moods.
