@@ -8,6 +8,7 @@
     "bull": "^4.16.4",
     "cors": "^2.8.5",
     "cra-template": "1.2.0",
+    "deepinfra": "^2.0.2",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "ioredis": "^5.4.1",

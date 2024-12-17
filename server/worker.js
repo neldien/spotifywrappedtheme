@@ -1,70 +1,60 @@
-const videoQueue = require('./queue');
+const Bull = require('bull');
 const axios = require('axios');
 require('dotenv').config();
 
-const MODEL_ENDPOINT = process.env.MODEL_ENDPOINT?.replace(/['"]/g, '');
-
-console.log('Video generation worker started with config:', {
-    modelEndpoint: MODEL_ENDPOINT,
-    hasApiKey: !!process.env.DEEPINFRA_API_KEY
+const videoQueue = new Bull('video-generation', process.env.REDIS_URL, {
+  redis: {
+    tls: process.env.REDIS_URL.startsWith('rediss://') ? {} : undefined, // Enable TLS if needed
+  },
 });
 
+console.log('Worker started. Waiting for jobs...');
+
+// Process jobs without timeout (custom error handling ensures no abrupt exits)
 videoQueue.process(async (job) => {
-    try {
-        // Simplify and truncate the prompt
-        const originalPrompt = job.data.prompt;
-        const simplifiedPrompt = originalPrompt
-            .split('Image Description:')[0] // Remove image description
-            .replace(/\n/g, ' ') // Remove newlines
-            .replace(/\s+/g, ' ') // Remove extra spaces
-            .trim()
-            .slice(0, 500); // Limit to 500 characters
+  const { prompt } = job.data;
 
-        console.log(`Processing job ${job.id} with simplified prompt:`, simplifiedPrompt);
+  console.log(`Processing job ${job.id} with prompt: ${prompt}`);
 
-        const payload = {
-            prompt: simplifiedPrompt,
-            width: 848,
-            height: 480,
-            duration: 4.0,        // Slightly reduced
-            num_inference_steps: 50,  // Reduced for faster processing
-            cfg_scale: 4.5,
-            seed: 12345
-        };
+  try {
+    const apiUrl = 'https://api.deepinfra.com/v1/inference/genmo/mochi-1-preview';
+    console.log(`Sending request to ${apiUrl} for job ${job.id}`);
 
-        console.log(`Making API request for job ${job.id}`, {
-            endpoint: MODEL_ENDPOINT,
-            prompt: simplifiedPrompt,
-            promptLength: simplifiedPrompt.length
-        });
+    const response = await axios.post(
+      apiUrl,
+      {
+        prompt,
+        width: 1280,
+        height: 720,
+        duration: 5.1,
+        num_inference_steps: 128,
+        cfg_scale: 5,
+        seed: 12345,
+      },
+      {
+        headers: { Authorization: `Bearer ${process.env.DEEPINFRA_API_KEY}` },
+        timeout: 0, // No timeout
+      }
+    );
 
-        const response = await axios.post(
-            MODEL_ENDPOINT,
-            payload,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.DEEPINFRA_API_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
+    const videoUrl = response.data.video_url;
+    console.log(`Job ${job.id} completed. Video URL: ${videoUrl}`);
 
-        console.log(`API response for job ${job.id}:`, {
-            status: response.status,
-            data: response.data
-        });
+    return { videoUrl };
+  } catch (error) {
+    console.error(`Job ${job.id} failed:`, error.response?.data || error.message);
+    throw new Error('Video generation failed');
+  }
+});
 
-        if (!response.data.video_url) {
-            throw new Error('No video URL in response');
-        }
+// Retry logic
+videoQueue.on('failed', (job, err) => {
+  console.error(`Job ${job.id} failed after retries: ${err.message}`);
+});
 
-        return { videoUrl: response.data.video_url };
-    } catch (error) {
-        console.error(`Job ${job.id} failed:`, {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status
-        });
-        throw error;
-    }
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('Shutting down worker...');
+  await videoQueue.close();
+  process.exit(0);
 });
