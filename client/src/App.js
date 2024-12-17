@@ -91,51 +91,54 @@ function App() {
 
     try {
       const requestBody = {
-        prompt: `Music Summary: ${generatedSummary}. ${imageDescription ? `Image Description: ${imageDescription}` : ''
-          }`,
+        prompt: `Music Summary: ${generatedSummary}. ${
+          imageDescription ? `Image Description: ${imageDescription}` : ''
+        }`,
       };
 
-      console.log('Sending payload:', requestBody);
-
-      alert('Generating video... This may take a few minutes.');
+      console.log('Sending video generation request...');
       const { data } = await axios.post(`${API_BASE_URL}/generate-video`, requestBody);
       const { jobId } = data;
 
-      console.log(`Job enqueued. Job ID: ${jobId}`);
+      console.log(`Job enqueued with ID: ${jobId}`);
 
-      let jobStatus = null;
-      let videoUrl = null;
+      // Maximum polling time (5 minutes)
+      const MAX_POLL_TIME = 5 * 60 * 1000;
+      const startTime = Date.now();
+      
+      while (true) {
+        // Check if we've exceeded maximum polling time
+        if (Date.now() - startTime > MAX_POLL_TIME) {
+          throw new Error('Video generation timed out after 5 minutes');
+        }
 
-      while (jobStatus !== 'completed') {
         const statusResponse = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
-        jobStatus = statusResponse.data.state;
+        const { state, result } = statusResponse.data;
+        
+        console.log(`Job ${jobId} status: ${state}`);
 
-        if (jobStatus === 'completed') {
-          videoUrl = statusResponse.data.result.videoUrl;
-          console.log('Job completed. Video URL:', videoUrl);
+        if (state === 'completed' && result?.videoUrl) {
+          console.log('Video generation completed:', result.videoUrl);
+          const link = document.createElement('a');
+          link.href = result.videoUrl;
+          link.download = 'music_summary_video.mp4';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          alert('Your video has been generated and downloaded successfully!');
           break;
         }
 
-        if (jobStatus === 'failed') {
-          alert('Video generation failed. Please try again.');
-          setIsGeneratingVideo(false);
-          return;
+        if (state === 'failed') {
+          throw new Error(`Video generation failed: ${statusResponse.data.failedReason || 'Unknown error'}`);
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        // Wait 5 seconds before next poll
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
-
-      const link = document.createElement('a');
-      link.href = videoUrl;
-      link.download = 'music_summary_video.mp4';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      alert('Your video has been generated and downloaded successfully!');
     } catch (error) {
-      console.error('Error generating video:', error.response?.data || error.message);
-      alert('Failed to generate video. Please try again.');
+      console.error('Error in video generation:', error);
+      alert(error.message || 'Failed to generate video. Please try again.');
     } finally {
       setIsGeneratingVideo(false);
     }
