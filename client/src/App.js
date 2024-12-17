@@ -50,7 +50,10 @@ function App() {
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    setUploadedImage(file); // Show the uploaded image only
+    setUploadedImage(file);
+
+    // Generate preview URL for the image
+    setPreviewUrl(URL.createObjectURL(file));
 
     const formData = new FormData();
     formData.append('image', file);
@@ -61,8 +64,7 @@ function App() {
       });
 
       console.log('Image Description:', response.data.description);
-      // Store description in a variable for use in the prompt but don't show it
-      setImageDescription(response.data.description); // Use internally
+      setImageDescription(response.data.description);
     } catch (error) {
       console.error('Error describing image:', error.message);
       alert('Failed to describe the image. Try again.');
