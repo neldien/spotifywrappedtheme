@@ -272,14 +272,19 @@ app.post('/generate-video', async (req, res) => {
     }
 
     try {
-        // Enqueue the job
+        // Add job to the queue
         const job = await videoQueue.add({ prompt });
 
-        // Return the job ID to the client
-        res.status(202).json({ jobId: job.id, message: 'Video generation started' });
+        console.log(`Job ${job.id} added to the queue`);
+
+        // Respond immediately with job ID
+        res.status(202).json({
+            jobId: job.id,
+            message: 'Video generation job enqueued. Check job status later.',
+        });
     } catch (error) {
-        console.error('Error enqueuing job:', error.message);
-        res.status(500).json({ error: 'Failed to enqueue video generation job.' });
+        console.error('Error adding job to queue:', error.message);
+        res.status(500).json({ error: 'Failed to enqueue job.' });
     }
 });
 
