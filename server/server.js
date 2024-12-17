@@ -20,6 +20,7 @@ const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
 
+
 const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:3000'];
 
 app.use(cors({
@@ -283,9 +284,8 @@ app.post('/generate-video', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log('Server is running...');
+    console.log(`Server is running on port ${PORT}`);
 });
-
 // Generate Music Summary with ChatGPT
 app.post('/generate-summary', async (req, res) => {
     const { topArtists, topTracks } = req.body;
@@ -350,8 +350,4 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
         console.error("Error describing image:", error.message);
         res.status(500).json({ error: "Failed to process the image." });
     }
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT}`);
 });
