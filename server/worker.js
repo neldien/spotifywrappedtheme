@@ -1,11 +1,8 @@
-const Bull = require('bull');
+const videoQueue = require('./queue');
 const axios = require('axios');
 require('dotenv').config();
 
 console.log('Worker started...');
-
-// Initialize Bull queue with REDIS_URL
-const videoQueue = new Bull('video-generation', process.env.REDIS_URL);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
