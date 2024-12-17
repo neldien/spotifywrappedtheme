@@ -3,6 +3,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const { OpenAI } = require("openai");
+const path = require('path');
 
 // ChatGPT API Setup
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -27,9 +28,6 @@ app.get('/api', (req, res) => {
 });
 
 // Serve React frontend for all other routes
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-});
 
 
 app.get('/', (req, res) => {
@@ -161,6 +159,9 @@ app.get('/top-summary', async (req, res) => {
     }
 });
 
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+});
 
 // Endpoint to Generate Prompts
 app.post('/generate-video-prompt', async (req, res) => {
