@@ -10,25 +10,32 @@ console.log('Video generation worker started with config:', {
 });
 
 videoQueue.process(async (job) => {
-    console.log(`Processing job ${job.id}`, {
-        prompt: job.data.prompt?.substring(0, 100) + '...'
-    });
-    
     try {
-        // Using their default values from the API docs
+        // Simplify and truncate the prompt
+        const originalPrompt = job.data.prompt;
+        const simplifiedPrompt = originalPrompt
+            .split('Image Description:')[0] // Remove image description
+            .replace(/\n/g, ' ') // Remove newlines
+            .replace(/\s+/g, ' ') // Remove extra spaces
+            .trim()
+            .slice(0, 500); // Limit to 500 characters
+
+        console.log(`Processing job ${job.id} with simplified prompt:`, simplifiedPrompt);
+
         const payload = {
-            prompt: job.data.prompt,
-            width: 848,          // Default from docs
-            height: 480,         // Default from docs
-            duration: 5.1,       // Default from docs (max)
-            num_inference_steps: 100,  // Default from docs
-            cfg_scale: 4.5,      // Default from docs
-            seed: 12345          // Optional
+            prompt: simplifiedPrompt,
+            width: 848,
+            height: 480,
+            duration: 4.0,        // Slightly reduced
+            num_inference_steps: 50,  // Reduced for faster processing
+            cfg_scale: 4.5,
+            seed: 12345
         };
 
         console.log(`Making API request for job ${job.id}`, {
             endpoint: MODEL_ENDPOINT,
-            payloadLength: JSON.stringify(payload).length
+            prompt: simplifiedPrompt,
+            promptLength: simplifiedPrompt.length
         });
 
         const response = await axios.post(
