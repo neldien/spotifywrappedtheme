@@ -4,17 +4,11 @@ require('dotenv').config();
 
 console.log('Worker started...');
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-    console.log('Worker shutting down...');
-    await videoQueue.close();
-    console.log('Queue closed. Exiting.');
-    process.exit(0);
-});
-
-// Process jobs
+// Process jobs with better error handling
 videoQueue.process(async (job) => {
+    console.log(`Starting job ${job.id}`);
     const { prompt } = job.data;
+    
     try {
         console.log(`Processing job ${job.id} with prompt: ${prompt}`);
 
@@ -34,28 +28,36 @@ videoQueue.process(async (job) => {
                     Authorization: `Bearer ${process.env.DEEPINFRA_API_KEY}`,
                     'Content-Type': 'application/json',
                 },
-                timeout: 600000, // 10 minutes timeout
+                timeout: 600000,
             }
         );
 
         const videoUrl = response.data.video_url;
         console.log(`Job ${job.id} completed successfully. Video URL: ${videoUrl}`);
-
         return { videoUrl };
     } catch (error) {
         console.error(`Job ${job.id} failed:`, error.message);
-        throw new Error('Video generation failed');
+        throw new Error(`Video generation failed: ${error.message}`);
     }
 });
 
-videoQueue.on('completed', (job, result) => {
-    console.log(`Job ${job.id} completed. Result: ${JSON.stringify(result)}`);
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('Worker shutting down...');
+    try {
+        await videoQueue.close();
+        console.log('Queue closed successfully');
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+    }
+    process.exit(0);
 });
 
-videoQueue.on('failed', (job, err) => {
-    console.error(`Job ${job.id} failed: ${err.message}`);
+// Keep the process running
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
 });
 
-videoQueue.on('error', (error) => {
-    console.error('Queue Error:', error.message);
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
