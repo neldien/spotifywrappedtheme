@@ -356,3 +356,26 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
         res.status(500).json({ error: "Failed to process the image." });
     }
 });
+
+app.get('/redis-health', async (req, res) => {
+    try {
+        const queueHealth = await videoQueue.checkHealth();
+        const queueCount = await videoQueue.count();
+        
+        res.json({
+            status: 'ok',
+            redis: {
+                connected: true,
+                url: process.env.REDIS_URL.split('@')[1], // Safe logging
+                jobsCount: queueCount
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});

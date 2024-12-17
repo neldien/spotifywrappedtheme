@@ -2,6 +2,10 @@ const videoQueue = require('./queue');
 const axios = require('axios');
 require('dotenv').config();
 
+// Log Redis connection info (safely)
+const redisUrl = process.env.REDIS_URL;
+console.log('Worker connecting to Redis at:', redisUrl.split('@')[1]);
+
 console.log('Worker started with process ID:', process.pid);
 
 videoQueue.process(async (job) => {
