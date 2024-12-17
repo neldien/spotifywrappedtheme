@@ -102,14 +102,14 @@ function App() {
 
       console.log(`Job enqueued with ID: ${jobId}`);
 
-      // Maximum polling time (5 minutes)
-      const MAX_POLL_TIME = 5 * 60 * 1000;
+      // Maximum polling time (15 minutes)
+      const MAX_POLL_TIME = 15 * 60 * 1000;
       const startTime = Date.now();
       
       while (true) {
         // Check if we've exceeded maximum polling time
         if (Date.now() - startTime > MAX_POLL_TIME) {
-          throw new Error('Video generation timed out after 5 minutes');
+          throw new Error('Video generation timed out after 15 minutes');
         }
 
         const statusResponse = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
