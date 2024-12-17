@@ -290,27 +290,20 @@ app.post('/generate-music-prompt', async (req, res) => {
 
 app.post('/generate-video', async (req, res) => {
     const { prompt } = req.body;
-
+  
     if (!prompt) {
-        return res.status(400).json({ error: "The 'prompt' field is required." });
+      return res.status(400).json({ error: "The 'prompt' field is required." });
     }
-
+  
     try {
-        // Add job to the queue
-        const job = await videoQueue.add({ prompt });
-
-        console.log(`Job ${job.id} added to the queue`);
-
-        // Respond immediately with job ID
-        res.status(202).json({
-            jobId: job.id,
-            message: 'Video generation job enqueued. Check job status later.',
-        });
+      const job = await videoQueue.add({ prompt }, { removeOnComplete: true });
+      console.log(`Job ${job.id} added to the queue`);
+      res.status(202).json({ jobId: job.id, message: 'Job added to queue' });
     } catch (error) {
-        console.error('Error adding job to queue:', error.message);
-        res.status(500).json({ error: 'Failed to enqueue job.' });
+      console.error('Error adding job:', error.message);
+      res.status(500).json({ error: 'Failed to enqueue job' });
     }
-});
+  });
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
