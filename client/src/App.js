@@ -90,47 +90,30 @@ function App() {
     setIsGeneratingVideo(true);
 
     try {
+      console.log('Starting video generation...');
       const requestBody = {
         prompt: `Music Summary: ${generatedSummary}. ${
           imageDescription ? `Image Description: ${imageDescription}` : ''
         }`,
       };
 
-      console.log('Sending video generation request...');
-      const { data } = await axios.post(`${API_BASE_URL}/generate-video`, requestBody);
-      const { jobId } = data;
+      // Queue the job
+      const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`, requestBody);
+      console.log('Job queued:', jobData);
 
-      console.log(`Job enqueued with ID: ${jobId}`);
-
-      // Maximum polling time (15 minutes)
-      const MAX_POLL_TIME = 15 * 60 * 1000;
-      const startTime = Date.now();
-      
+      // Poll for completion
       while (true) {
-        // Check if we've exceeded maximum polling time
-        if (Date.now() - startTime > MAX_POLL_TIME) {
-          throw new Error('Video generation timed out after 15 minutes');
-        }
+        const { data: statusData } = await axios.get(`${API_BASE_URL}/job-status/${jobData.jobId}`);
+        console.log('Job status:', statusData);
 
-        const statusResponse = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
-        const { state, result } = statusResponse.data;
-        
-        console.log(`Job ${jobId} status: ${state}`);
-
-        if (state === 'completed' && result?.videoUrl) {
-          console.log('Video generation completed:', result.videoUrl);
-          const link = document.createElement('a');
-          link.href = result.videoUrl;
-          link.download = 'music_summary_video.mp4';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          alert('Your video has been generated and downloaded successfully!');
+        if (statusData.state === 'completed' && statusData.result?.videoUrl) {
+          console.log('Video generated:', statusData.result.videoUrl);
+          window.open(statusData.result.videoUrl, '_blank');
           break;
         }
 
-        if (state === 'failed') {
-          throw new Error(`Video generation failed: ${statusResponse.data.failedReason || 'Unknown error'}`);
+        if (statusData.state === 'failed') {
+          throw new Error(statusData.failedReason || 'Video generation failed');
         }
 
         // Wait 5 seconds before next poll
@@ -138,7 +121,7 @@ function App() {
       }
     } catch (error) {
       console.error('Error in video generation:', error);
-      alert(error.message || 'Failed to generate video. Please try again.');
+      alert(error.response?.data?.error || error.message || 'Failed to generate video');
     } finally {
       setIsGeneratingVideo(false);
     }
