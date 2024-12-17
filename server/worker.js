@@ -6,29 +6,14 @@ require('dotenv').config();
 console.log('Worker started...');
 
 // Initialize Redis with robust reconnect logic
-const redisOptions = {
+
+
+// Initialize Bull queue
+const videoQueue = new Bull('video-generation', {
     redis: {
-        port: 6379,
-        host: process.env.REDIS_HOST || '127.0.0.1',
-        password: process.env.REDIS_PASSWORD,
-        retryStrategy: (times) => Math.min(times * 50, 2000), // Exponential backoff
-        reconnectOnError: (err) => {
-            console.error('Redis reconnecting due to error:', err.message);
-            return true;
-        },
+        url: process.env.REDIS_URL, // REDIS_URL for Heroku managed Redis
+        tls: process.env.REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
     },
-};
-
-// Initialize the Bull queue
-const videoQueue = new Bull('video-generation', redisOptions);
-
-// Graceful Shutdown
-process.on('SIGTERM', () => {
-    console.log('Worker shutting down...');
-    videoQueue.close().then(() => {
-        console.log('Queue closed.');
-        process.exit(0);
-    });
 });
 
 // Worker processing logic with concurrency and timeout
