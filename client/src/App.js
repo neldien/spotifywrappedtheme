@@ -103,22 +103,21 @@ function App() {
 
       // Poll for completion
       while (true) {
-        const { data } = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
-        console.log('Job status:', data.state);
-      
-        if (data.state === 'completed') {
-          const videoUrl = data.result.videoUrl;
-          console.log('Video generated:', videoUrl);
-          window.open(videoUrl, '_blank');
+        const { data: statusData } = await axios.get(`${API_BASE_URL}/job-status/${jobData.jobId}`);
+        console.log('Job status:', statusData);
+
+        if (statusData.state === 'completed' && statusData.result?.videoUrl) {
+          console.log('Video generated:', statusData.result.videoUrl);
+          window.open(statusData.result.videoUrl, '_blank');
           break;
         }
-      
-        if (data.state === 'failed') {
-          alert('Video generation failed.');
-          return;
+
+        if (statusData.state === 'failed') {
+          throw new Error(statusData.failedReason || 'Video generation failed');
         }
-      
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+
+        // Wait 5 seconds before next poll
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     } catch (error) {
       console.error('Error in video generation:', error);
