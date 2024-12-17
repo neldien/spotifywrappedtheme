@@ -352,6 +352,6 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT}`);
 });
