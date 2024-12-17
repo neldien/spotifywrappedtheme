@@ -10,7 +10,7 @@ function App() {
   const [imageDescription, setImageDescription] = useState('');
   const [uploadedImage, setUploadedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   // Extract access token from URL
   useEffect(() => {
@@ -24,7 +24,7 @@ function App() {
   // Fetch Top Summary
   const fetchTopSummary = async (token) => {
     try {
-      const { data } = await axios.get('http://localhost:5001/top-summary', {
+      const { data } = await axios.get(`${API_BASE_URL}/top-summary`, {
         params: { access_token: token },
       });
 
@@ -56,7 +56,7 @@ function App() {
     formData.append('image', file);
 
     try {
-      const response = await axios.post('http://localhost:5001/describe-image', formData, {
+      const response = await axios.post(`${API_BASE_URL}/describe-image`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -72,7 +72,7 @@ function App() {
   // Generate a Music Taste Summary
   const generateSummary = async (summaryData) => {
     try {
-      const { data } = await axios.post('http://localhost:5001/generate-summary', summaryData);
+      const { data } = await axios.post(`${API_BASE_URL}/generate-summary`, summaryData);
       setGeneratedSummary(data.summary);
     } catch (error) {
       console.error('Error generating summary:', error.message);
@@ -110,7 +110,7 @@ function App() {
 
       console.log('Generating video prompt...');
       const videoPromptResponse = await axios.post(
-        'http://localhost:5001/generate-video-prompt',
+        `${API_BASE_URL}/generate-video-prompt`,
         requestBody
       );
 
@@ -119,7 +119,7 @@ function App() {
 
       // Step 2: Generate the video
       const videoResponse = await axios.post(
-        'http://localhost:5001/generate-video',
+        `${API_BASE_URL}/generate-video`,
         { prompt: optimizedPrompt }
       );
 

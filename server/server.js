@@ -68,7 +68,7 @@ app.get('/callback', async (req, res) => {
         const { access_token, refresh_token } = response.data;
 
         // Redirect to frontend with tokens as query parameters
-        res.redirect(`http://localhost:3000?access_token=${access_token}&refresh_token=${refresh_token}`);
+        res.redirect(`${process.env.CLIENT_URL}?access_token=${access_token}&refresh_token=${refresh_token}`);
     } catch (error) {
         console.error('Error exchanging code for tokens:', error.message);
         res.status(500).send('Authentication failed');
