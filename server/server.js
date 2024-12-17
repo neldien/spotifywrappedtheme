@@ -4,6 +4,9 @@ const axios = require('axios');
 const cors = require('cors');
 const { OpenAI } = require("openai");
 const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
+const upload = multer({ dest: 'uploads/' }); // Save uploads temporarily to 'uploads' folder
 
 // ChatGPT API Setup
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -170,17 +173,18 @@ app.post('/generate-video-prompt', async (req, res) => {
     try {
         const videoPromptTemplate = `
             Transform the following music summary into a video creation prompt: "${musicSummary}"
+            ${imageDescription ? `Additionally, incorporate the following visual descriptions to be the main characters in the prompt: "${imageDescription}".` : ''}
             Follow these guidelines:
             - Describe a vivid visual scene (e.g., location, time of day, lighting, colors).
             - Include movement or dynamic actions.
             - Add specific cinematic details like camera angles, textures, and moods.
-            - Keep it under 100 words for optimal text-to-video generation.
+            - Keep it under 120 words for optimal text-to-video generation.
         `;
 
         const response = await openai.chat.completions.create({
-            model: 'gpt-4',
+            model: 'gpt-4o',
             messages: [{ role: "user", content: videoPromptTemplate }],
-            max_tokens: 120,
+            max_tokens: 150,
         });
 
         const optimizedPrompt = response.choices[0].message.content;
@@ -206,7 +210,7 @@ app.post('/generate-music-prompt', async (req, res) => {
         `;
 
         const response = await openai.chat.completions.create({
-            model: 'gpt-4',
+            model: 'gpt-4o',
             messages: [{ role: "user", content: musicPromptTemplate }],
             max_tokens: 100,
         });
@@ -232,11 +236,11 @@ app.post('/generate-video', async (req, res) => {
             "https://api.deepinfra.com/v1/inference/genmo/mochi-1-preview",
             {
                 prompt, // Pass the prompt to DeepInfra
-                width: 848,
-                height: 480,
+                width: 1280,
+                height: 720,
                 duration: 5.1,
-                num_inference_steps: 64,
-                cfg_scale: 4.5,
+                num_inference_steps: 128,
+                cfg_scale: 5,
                 seed: 12345,
             },
             {
@@ -267,13 +271,13 @@ app.post('/generate-summary', async (req, res) => {
             My favorite artists are: ${artistNames}. 
             My favorite tracks are: ${trackNames}. 
             Describe the energy, vibe, and themes of this music taste. 
-            Keep it under 200 words.
+            Keep it under 150 words, dont feel the need to use all the artists or tracks. i dont want to be overwhelmed. feel free to break it into paragraphs and what not.
         `;
 
         const response = await openai.chat.completions.create({
-            model: 'gpt-4',
+            model: 'gpt-4o',
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 250,
+            max_tokens: 400,
         });
 
         const summary = response.choices[0].message.content;
@@ -284,6 +288,41 @@ app.post('/generate-summary', async (req, res) => {
     }
 });
 
+app.post('/describe-image', upload.single('image'), async (req, res) => {
+    try {
+        const filePath = req.file.path;
+
+        // Send the image to OpenAI GPT-4 Vision
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o", // OpenAI GPT-4 Vision model
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: "Describe this image in an accurate way, including features of the individual, and race, so that it can be used in a video prompt. be concise" },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:image/jpeg;base64,${fs.readFileSync(filePath, { encoding: 'base64' })}`
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens: 250,
+        });
+
+        // Cleanup uploaded file
+        fs.unlinkSync(filePath);
+
+        // Extract description
+        const description = response.choices[0].message.content;
+        res.json({ description });
+    } catch (error) {
+        console.error("Error describing image:", error.message);
+        res.status(500).json({ error: "Failed to process the image." });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
