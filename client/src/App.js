@@ -153,7 +153,7 @@ function App() {
 
       {/* Login Button */}
       {!accessToken ? (
-        <a href="http://localhost:5001/login">
+        <a href={`${process.env.REACT_APP_API_URL}/login`}>
           <button className="login-button">Login with Spotify</button>
         </a>
       ) : topSummary ? (

@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 5001;
 
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'http://localhost:5001/callback';
+const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
 
 app.use(cors());
@@ -325,5 +325,5 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on ${PORT}`);
 });
