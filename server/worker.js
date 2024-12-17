@@ -7,8 +7,14 @@ const videoQueue = new Bull('video-generation', process.env.REDIS_URL);
 
 console.log('Worker started...');
 
-// Process the video generation job
-videoQueue.process(async (job) => {
+// Graceful Shutdown
+process.on('SIGTERM', () => {
+    console.log('Worker shutting down...');
+    videoQueue.close().then(() => process.exit(0));
+});
+
+// Process the video generation job with concurrency limit
+videoQueue.process(3, async (job) => {
     const { prompt } = job.data;
 
     try {
@@ -30,6 +36,7 @@ videoQueue.process(async (job) => {
                     Authorization: `Bearer ${process.env.DEEPINFRA_API_KEY}`,
                     'Content-Type': 'application/json',
                 },
+                timeout: 600000,
             }
         );
 
@@ -38,7 +45,7 @@ videoQueue.process(async (job) => {
 
         return { videoUrl };
     } catch (error) {
-        console.error(`Job ${job.id} failed:`, error.message);
+        console.error(`Job ${job.id} failed:`, error.response?.data || error.message);
         throw new Error('Video generation failed');
     }
 });
