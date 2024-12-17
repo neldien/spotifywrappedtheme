@@ -87,32 +87,22 @@ function App() {
       return;
     }
 
-    // Check if no image is uploaded and confirm
-    if (!uploadedImage) {
-      const proceedWithoutImage = window.confirm(
-        'You have not uploaded an image. Uploading one can increase context and personalize the video. Do you want to proceed without an image?'
-      );
-      if (!proceedWithoutImage) {
-        alert('Please upload an image to enhance the video.');
-        return;
-      }
-    }
-
     setIsGeneratingVideo(true);
 
     try {
       const requestBody = {
-        musicSummary: generatedSummary,
-        imageDescription: imageDescription || '', // Pass image description if available
+        prompt: `Music Summary: ${generatedSummary}. ${imageDescription ? `Image Description: ${imageDescription}` : ''
+          }`,
       };
 
-      // Step 1: Enqueue the job
-      alert('Generating video... This may take a few minutes. You will be notified when it is ready.');
+      console.log('Sending payload:', requestBody);
+
+      alert('Generating video... This may take a few minutes.');
       const { data } = await axios.post(`${API_BASE_URL}/generate-video`, requestBody);
       const { jobId } = data;
+
       console.log(`Job enqueued. Job ID: ${jobId}`);
 
-      // Step 2: Poll for job completion
       let jobStatus = null;
       let videoUrl = null;
 
@@ -132,11 +122,9 @@ function App() {
           return;
         }
 
-        // Wait before checking the status again
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
 
-      // Step 3: Trigger video download
       const link = document.createElement('a');
       link.href = videoUrl;
       link.download = 'music_summary_video.mp4';
@@ -146,13 +134,12 @@ function App() {
 
       alert('Your video has been generated and downloaded successfully!');
     } catch (error) {
-      console.error('Error generating video:', error.message);
+      console.error('Error generating video:', error.response?.data || error.message);
       alert('Failed to generate video. Please try again.');
     } finally {
       setIsGeneratingVideo(false);
     }
   };
-
 
   return (
     <div className="app-container">
