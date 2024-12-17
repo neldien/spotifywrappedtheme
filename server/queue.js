@@ -1,9 +1,12 @@
 const Bull = require('bull');
 const Redis = require('ioredis');
+require('dotenv').config();
 
 // Parse Redis URL and configure connection options
 const redisUrl = process.env.REDIS_URL;
 const isTLS = redisUrl.startsWith('rediss://');
+
+console.log('Connecting to Redis at:', redisUrl.split('@')[1]); // Log Redis host (safely)
 
 const redisOptions = {
     maxRetriesPerRequest: 3,
@@ -22,28 +25,21 @@ const redisOptions = {
     } : undefined
 };
 
-// Create a single Redis client instance
-const redisClient = new Redis(redisUrl, redisOptions);
-
-redisClient.on('connect', () => console.log('Redis client connected'));
-redisClient.on('error', (err) => console.error('Redis client error:', err));
-
-// Configure Bull with a single Redis client
-const videoQueue = new Bull('video-generation', {
-    redis: redisClient,
+// Configure Bull with the Redis URL directly
+const videoQueue = new Bull('video-generation', redisUrl, {
     defaultJobOptions: {
         attempts: 3,
         backoff: {
             type: 'exponential',
             delay: 1000
         },
-        timeout: 600000, // 10 minutes
+        timeout: 600000,
         removeOnComplete: true,
         removeOnFail: false
     }
 });
 
-// Add more detailed queue logging
+// Add queue event handlers
 videoQueue.on('error', (error) => {
     console.error('Queue Error:', error);
 });
@@ -62,6 +58,13 @@ videoQueue.on('completed', (job, result) => {
 
 videoQueue.on('failed', (job, error) => {
     console.error('Job failed:', job.id, error);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('Shutting down queue...');
+    await videoQueue.close();
+    console.log('Queue shut down complete');
 });
 
 module.exports = videoQueue;
