@@ -381,6 +381,25 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
     }
 });
 
+app.post('/api/clear-queue', async (req, res) => {
+    try {
+        // Check Redis connection first
+        const redisStatus = await videoQueue.client.ping();
+        console.log('Redis status:', redisStatus);
+
+        if (redisStatus !== 'PONG') {
+            throw new Error('Redis is not connected');
+        }
+
+        await videoQueue.empty(); // Clear the queue
+        console.log('Queue cleared successfully');
+        res.status(200).json({ message: 'Queue cleared successfully' });
+    } catch (error) {
+        console.error('Error clearing queue:', error.message);
+        res.status(500).json({ error: 'Failed to clear queue' });
+    }
+});
+
 app.get('/redis-health', async (req, res) => {
     try {
         const queueHealth = await videoQueue.checkHealth();
@@ -404,17 +423,4 @@ app.get('/redis-health', async (req, res) => {
     }
 });
 
-app.post('/api/clear-queue', async (req, res) => {
-    try {
-        await videoQueue.empty();
-        await videoQueue.clean(0, 'completed');
-        await videoQueue.clean(0, 'failed');
-        await videoQueue.clean(0, 'waiting');
-        
-        console.log('Queue cleared');
-        res.json({ message: 'Queue cleared successfully' });
-    } catch (error) {
-        console.error('Error clearing queue:', error);
-        res.status(500).json({ error: 'Failed to clear queue' });
-    }
-});
+
