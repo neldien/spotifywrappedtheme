@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const videoQueue = require('./queue');
 const axios = require('axios');
 const cors = require('cors');
 const { OpenAI } = require("openai");
@@ -7,11 +8,11 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const upload = multer({ dest: 'uploads/' }); // Save uploads temporarily to 'uploads' folder
+const app = express();
 
 // ChatGPT API Setup
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const app = express();
 const PORT = process.env.PORT || 5001;
 
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
@@ -174,6 +175,26 @@ app.get('/top-summary', async (req, res) => {
     }
 });
 
+app.get('/job-status/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const job = await videoQueue.getJob(id);
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        const state = await job.getState();
+        const result = job.returnvalue;
+
+        res.json({ state, result });
+    } catch (error) {
+        console.error('Error fetching job status:', error.message);
+        res.status(500).json({ error: 'Failed to fetch job status' });
+    }
+});
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
@@ -184,14 +205,20 @@ app.post('/generate-video-prompt', async (req, res) => {
 
     try {
         const videoPromptTemplate = `
-            Transform the following music summary into a video creation prompt: "${musicSummary}"
-            ${imageDescription ? `Additionally, incorporate the following visual descriptions to be the main characters in the prompt: "${imageDescription}".` : ''}
-            Follow these guidelines:
-            - the people in the image description are the subjects of the scene. make sure theyre in it.
-            - Describe a vivid visual scene (e.g., location, time of day, lighting, colors).
-            - Include movement or dynamic actions.
-            - Add specific cinematic details like camera angles, textures, and moods.
-            - Keep it under 120 words for optimal text-to-video generation.
+        Transform the following input into a video creation prompt where the primary focus is on the subjects described in the image:
+        
+        1. Subjects: "${imageDescription}". These individuals or elements must be the main focus of the scene. Center the visuals around their appearance, actions, and presence.
+        
+        2. Scene Guidelines:
+        - The scene should reflect the **energy, mood, and themes** suggested by the following summary: "${musicSummary}".
+        - Avoid mentioning any other musicians, artists, or tracks from the summary. Use only its themes, vibes, and imagery for inspiration.
+        - Describe a vivid, cinematic scene with details like location, time of day, lighting, and colors.
+        - Include dynamic movement or actions that highlight the subjects' involvement in the scene.
+        - Add cinematic details: camera angles, textures, moods, and visual effects.
+        
+        3. Length: Keep the description under 120 words, ensuring it is concise and focused.
+        
+        **Goal**: Create a visually captivating and engaging scene where the subjects described in the image take center stage, inspired by the themes of the summary.
         `;
 
         const response = await openai.chat.completions.create({
@@ -237,40 +264,28 @@ app.post('/generate-music-prompt', async (req, res) => {
 });
 
 app.post('/generate-video', async (req, res) => {
-    const { prompt } = req.body; // Expect "prompt" field
+    const { prompt } = req.body;
 
     if (!prompt) {
-        console.error("Invalid or missing 'prompt'");
         return res.status(400).json({ error: "The 'prompt' field is required." });
     }
 
     try {
-        const response = await axios.post(
-            "https://api.deepinfra.com/v1/inference/genmo/mochi-1-preview",
-            {
-                prompt, // Pass the prompt to DeepInfra
-                width: 1280,
-                height: 720,
-                duration: 5.1,
-                num_inference_steps: 128,
-                cfg_scale: 5,
-                seed: 12345,
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${DEEPINFRA_API_KEY}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
+        // Enqueue the job
+        const job = await videoQueue.add({ prompt });
 
-        const videoUrl = response.data.video_url;
-        res.json({ videoUrl });
+        // Return the job ID to the client
+        res.status(202).json({ jobId: job.id, message: 'Video generation started' });
     } catch (error) {
-        console.error("Error generating video with DeepInfra:", error.response?.data || error.message);
-        res.status(500).json({ error: "Failed to generate video using DeepInfra." });
+        console.error('Error enqueuing job:', error.message);
+        res.status(500).json({ error: 'Failed to enqueue video generation job.' });
     }
 });
+
+app.listen(process.env.PORT || 5001, () => {
+    console.log('Server is running...');
+});
+
 // Generate Music Summary with ChatGPT
 app.post('/generate-summary', async (req, res) => {
     const { topArtists, topTracks } = req.body;

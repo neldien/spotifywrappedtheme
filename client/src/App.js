@@ -81,14 +81,13 @@ function App() {
     }
   };
 
-  // Generate and Download Video
   const generateAndDownloadVideo = async () => {
     if (!generatedSummary) {
       alert('Please wait for the music summary to be generated first.');
       return;
     }
 
-    // Check if no image is uploaded and inform the user
+    // Check if no image is uploaded and confirm
     if (!uploadedImage) {
       const proceedWithoutImage = window.confirm(
         'You have not uploaded an image. Uploading one can increase context and personalize the video. Do you want to proceed without an image?'
@@ -107,28 +106,37 @@ function App() {
         imageDescription: imageDescription || '', // Pass image description if available
       };
 
-      // Step 1: Confirmation after starting generation
-      alert('Generating video... This may take up to 5 minutes. Please wait.');
+      // Step 1: Enqueue the job
+      alert('Generating video... This may take a few minutes. You will be notified when it is ready.');
+      const { data } = await axios.post(`${API_BASE_URL}/generate-video`, requestBody);
+      const { jobId } = data;
+      console.log(`Job enqueued. Job ID: ${jobId}`);
 
-      console.log('Generating video prompt...');
-      const videoPromptResponse = await axios.post(
-        `${API_BASE_URL}/generate-video-prompt`,
-        requestBody
-      );
+      // Step 2: Poll for job completion
+      let jobStatus = null;
+      let videoUrl = null;
 
-      const optimizedPrompt = videoPromptResponse.data.optimizedPrompt;
-      console.log('Generated Video Prompt:', optimizedPrompt);
+      while (jobStatus !== 'completed') {
+        const statusResponse = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
+        jobStatus = statusResponse.data.state;
 
-      // Step 2: Generate the video
-      const videoResponse = await axios.post(
-        `${API_BASE_URL}/generate-video`,
-        { prompt: optimizedPrompt }
-      );
+        if (jobStatus === 'completed') {
+          videoUrl = statusResponse.data.result.videoUrl;
+          console.log('Job completed. Video URL:', videoUrl);
+          break;
+        }
 
-      const videoUrl = videoResponse.data.videoUrl;
-      console.log('Generated Video URL:', videoUrl);
+        if (jobStatus === 'failed') {
+          alert('Video generation failed. Please try again.');
+          setIsGeneratingVideo(false);
+          return;
+        }
 
-      // Step 3: Trigger download
+        // Wait before checking the status again
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+
+      // Step 3: Trigger video download
       const link = document.createElement('a');
       link.href = videoUrl;
       link.download = 'music_summary_video.mp4';
@@ -136,15 +144,13 @@ function App() {
       link.click();
       document.body.removeChild(link);
 
-      // Final confirmation after download
       alert('Your video has been generated and downloaded successfully!');
     } catch (error) {
-      console.error('Error generating video:', error.response?.data || error.message);
+      console.error('Error generating video:', error.message);
       alert('Failed to generate video. Please try again.');
     } finally {
       setIsGeneratingVideo(false);
     }
-
   };
 
 
