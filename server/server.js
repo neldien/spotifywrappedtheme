@@ -196,6 +196,30 @@ app.get('/job-status/:id', async (req, res) => {
     }
 });
 
+app.get('/api/queue-status', async (req, res) => {
+    try {
+        const counts = await videoQueue.getJobCounts();
+        const isReady = await videoQueue.isReady();
+        
+        res.json({
+            status: 'ok',
+            isReady,
+            counts,
+            redis: {
+                url: process.env.REDIS_URL.split('@')[1], // Safe logging
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Queue status check failed:', error);
+        res.status(500).json({
+            status: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
