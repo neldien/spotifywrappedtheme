@@ -54,7 +54,7 @@ app.get('/', (req, res) => {
 // Step 1: Redirect user to Spotify login
 app.get('/login', (req, res) => {
     const scope = 'user-top-read playlist-read-private playlist-read-collaborative';
-    const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${scope}&redirect_uri=${process.env.SPOTIFY_REDIRECT_URI}&show_dialog=false`;
+    const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${scope}&redirect_uri=${process.env.SPOTIFY_REDIRECT_URI}`;
     res.redirect(authURL);
 });
 
