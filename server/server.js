@@ -18,6 +18,20 @@ const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
 app.use(cors());
 app.use(express.json());
 
+// Serve the React build from the client folder
+app.use(express.static(path.join(__dirname, '../client/build')));
+
+// API routes
+app.get('/api', (req, res) => {
+    res.json({ message: "API is running!" });
+});
+
+// Serve React frontend for all other routes
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+});
+
+
 app.get('/', (req, res) => {
     res.send('Server is running!');
 });
@@ -203,6 +217,7 @@ app.post('/generate-music-prompt', async (req, res) => {
         res.status(500).json({ error: "Failed to generate music prompt" });
     }
 });
+
 app.post('/generate-video', async (req, res) => {
     const { prompt } = req.body; // Expect "prompt" field
 
