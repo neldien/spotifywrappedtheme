@@ -403,3 +403,18 @@ app.get('/redis-health', async (req, res) => {
         });
     }
 });
+
+app.post('/api/clear-queue', async (req, res) => {
+    try {
+        await videoQueue.empty();
+        await videoQueue.clean(0, 'completed');
+        await videoQueue.clean(0, 'failed');
+        await videoQueue.clean(0, 'waiting');
+        
+        console.log('Queue cleared');
+        res.json({ message: 'Queue cleared successfully' });
+    } catch (error) {
+        console.error('Error clearing queue:', error);
+        res.status(500).json({ error: 'Failed to clear queue' });
+    }
+});
