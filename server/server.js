@@ -168,7 +168,7 @@ app.get('*', (req, res) => {
 
 // Endpoint to Generate Prompts
 app.post('/generate-video-prompt', async (req, res) => {
-    const { musicSummary } = req.body;
+    const { musicSummary, imageDescription } = req.body;
 
     try {
         const videoPromptTemplate = `
@@ -299,7 +299,7 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
                 {
                     role: "user",
                     content: [
-                        { type: "text", text: "Describe this image in an accurate way, including features of the individual, and race, so that it can be used in a video prompt. be concise" },
+                        { type: "text", text: "Describe this image in an accurate way, including physical features of the individual, so that it can be used in a video prompt. be concise" },
                         {
                             type: "image_url",
                             image_url: {
