@@ -1,22 +1,45 @@
 const Bull = require('bull');
 const Redis = require('ioredis');
 
-// Configure Redis connection with auto-reconnect options
-const redisClient = new Redis(process.env.REDIS_URL, {
-    retryStrategy: (times) => Math.min(times * 50, 2000), // Retry delay increases exponentially
+// Parse Redis URL and configure connection options
+const redisUrl = process.env.REDIS_URL;
+const isTLS = redisUrl.startsWith('rediss://');
+
+const redisOptions = {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    retryStrategy: (times) => {
+        if (times > 10) {
+            console.error('Redis connection failed after 10 retries');
+            return null;
+        }
+        return Math.min(times * 50, 2000);
+    },
     reconnectOnError: (err) => {
         console.error('Redis reconnecting due to error:', err.message);
-        return true; // Always attempt to reconnect
+        return true;
     },
-    maxRetriesPerRequest: null, // Prevent errors during long retries
-});
+    tls: isTLS ? {
+        rejectUnauthorized: false,
+    } : undefined
+};
 
-redisClient.on('connect', () => console.log('Connected to Redis.'));
-redisClient.on('reconnecting', () => console.log('Reconnecting to Redis...'));
+const redisClient = new Redis(redisUrl, redisOptions);
+
+redisClient.on('connect', () => console.log('Connected to Redis'));
 redisClient.on('error', (err) => console.error('Redis Error:', err));
+redisClient.on('reconnecting', () => console.log('Reconnecting to Redis...'));
 
 const videoQueue = new Bull('video-generation', {
-    redis: redisClient,
+    redis: redisUrl,
+    defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+            type: 'exponential',
+            delay: 1000
+        },
+        timeout: 600000 // 10 minutes
+    }
 });
 
 module.exports = videoQueue;
