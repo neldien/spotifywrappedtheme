@@ -2,59 +2,30 @@ const videoQueue = require('./queue');
 const axios = require('axios');
 require('dotenv').config();
 
-// Log Redis connection info (safely)
-const redisUrl = process.env.REDIS_URL;
-console.log('Worker connecting to Redis at:', redisUrl.split('@')[1]);
-
-console.log('Worker started with process ID:', process.pid);
+console.log('Video generation worker started');
 
 videoQueue.process(async (job) => {
-    console.log(`Starting to process job ${job.id}`);
-    console.log('Job data:', job.data);
+    console.log(`Processing job ${job.id}`);
     
-    const { prompt } = job.data;
-    
-    try {
-        // Log the API request
-        console.log(`Making API request to DeepInfra for job ${job.id}`);
-        
-        const response = await axios.post(
-            'https://api.deepinfra.com/v1/inference/genmo/mochi-1-preview',
-            {
-                prompt,
-                width: 1280,
-                height: 720,
-                duration: 5.1,
-                num_inference_steps: 128,
-                cfg_scale: 5,
-                seed: 12345,
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${process.env.DEEPINFRA_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                timeout: 600000,
+    const response = await axios.post(
+        process.env.MODEL_ENDPOINT,
+        {
+            prompt: job.data.prompt,
+            width: 1280,
+            height: 720,
+            duration: 5.1,
+            num_inference_steps: 128,
+            cfg_scale: 5,
+            seed: 12345,
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${process.env.DEEPINFRA_API_KEY}`,
+                'Content-Type': 'application/json',
             }
-        );
-
-        const videoUrl = response.data.video_url;
-        console.log(`Job ${job.id} completed successfully. Video URL:`, videoUrl);
-        return { videoUrl };
-    } catch (error) {
-        console.error(`Job ${job.id} failed with error:`, error.message);
-        if (error.response) {
-            console.error('API Response:', error.response.data);
         }
-        throw new Error(`Video generation failed: ${error.message}`);
-    }
-});
+    );
 
-// Keep the process running
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    console.log(`Job ${job.id} completed`);
+    return { videoUrl: response.data.video_url };
 });
