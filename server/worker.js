@@ -1,60 +1,25 @@
-const Bull = require('bull');
-const axios = require('axios');
-require('dotenv').config();
+const testQueue = require('./queue');
 
-const videoQueue = new Bull('video-generation', process.env.REDIS_URL, {
-  redis: {
-    tls: process.env.REDIS_URL.startsWith('rediss://') ? {} : undefined, // Enable TLS if needed
-  },
-});
+console.log('Test worker started');
 
-console.log('Worker started. Waiting for jobs...');
+testQueue.process(async (job) => {
+    console.log(`Starting job ${job.id}`);
+    
+    try {
+        let counter = 0;
+        const startTime = Date.now();
+        const twoMinutes = 2 * 60 * 1000; // 2 minutes in milliseconds
 
-// Process jobs without timeout (custom error handling ensures no abrupt exits)
-videoQueue.process(async (job) => {
-  const { prompt } = job.data;
+        while (Date.now() - startTime < twoMinutes) {
+            counter++;
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            console.log(`Job ${job.id}: ${counter} seconds elapsed`);
+        }
 
-  console.log(`Processing job ${job.id} with prompt: ${prompt}`);
-
-  try {
-    const apiUrl = 'https://api.deepinfra.com/v1/inference/genmo/mochi-1-preview';
-    console.log(`Sending request to ${apiUrl} for job ${job.id}`);
-
-    const response = await axios.post(
-      apiUrl,
-      {
-        prompt,
-        width: 1280,
-        height: 720,
-        duration: 5.1,
-        num_inference_steps: 128,
-        cfg_scale: 5,
-        seed: 12345,
-      },
-      {
-        headers: { Authorization: `Bearer ${process.env.DEEPINFRA_API_KEY}` },
-        timeout: 0, // No timeout
-      }
-    );
-
-    const videoUrl = response.data.video_url;
-    console.log(`Job ${job.id} completed. Video URL: ${videoUrl}`);
-
-    return { videoUrl };
-  } catch (error) {
-    console.error(`Job ${job.id} failed:`, error.response?.data || error.message);
-    throw new Error('Video generation failed');
-  }
-});
-
-// Retry logic
-videoQueue.on('failed', (job, err) => {
-  console.error(`Job ${job.id} failed after retries: ${err.message}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('Shutting down worker...');
-  await videoQueue.close();
-  process.exit(0);
+        console.log(`Job ${job.id} completed after ${counter} seconds`);
+        return { seconds: counter };
+    } catch (error) {
+        console.error(`Job ${job.id} failed:`, error);
+        throw error;
+    }
 });
