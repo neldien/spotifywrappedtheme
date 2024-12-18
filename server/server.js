@@ -288,20 +288,15 @@ app.post('/generate-music-prompt', async (req, res) => {
 app.post('/generate-video', async (req, res) => {
     try {
         const job = await videoQueue.add({
+            imagePrompt: req.body.imagePrompt,
             startTime: Date.now()
         });
         
-        console.log(`Video generation job ${job.id} added to queue`);
-        res.json({ 
-            jobId: job.id,
-            message: 'Video generation job enqueued'
-        });
+        console.log(`Video generation job ${job.id} started`);
+        res.json({ jobId: job.id });
     } catch (error) {
-        console.error('Error adding job:', error);
-        res.status(500).json({ 
-            error: 'Failed to start video generation',
-            details: error.message 
-        });
+        console.error('Error starting video generation:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -391,31 +386,10 @@ app.get('/job-status/:jobId', async (req, res) => {
             return res.status(404).json({ error: 'Job not found' });
         }
 
-        const state = await job.getState();
-        const result = job.returnvalue;
-
-        if (state === 'completed' && result?.fileName) {
-            const filePath = path.join(__dirname, 'videos', result.fileName);
-            
-            if (fs.existsSync(filePath)) {
-                res.json({
-                    id: job.id,
-                    state,
-                    downloadUrl: `/videos/${result.fileName}`,
-                    viewUrl: `/view-video/${job.id}`,
-                    completed: true
-                });
-            } else {
-                res.status(404).json({ error: 'Video file not found' });
-            }
-        } else {
-            res.json({
-                id: job.id,
-                state,
-                completed: false,
-                currentTime: new Date().toISOString()
-            });
-        }
+        res.json({
+            state: await job.getState(),
+            result: job.returnvalue
+        });
     } catch (error) {
         console.error('Status check error:', error);
         res.status(500).json({ error: error.message });
