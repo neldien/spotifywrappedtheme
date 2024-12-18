@@ -4,29 +4,16 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-// Create videos directory if it doesn't exist
-const videosDir = path.join(__dirname, 'videos');
-if (!fs.existsSync(videosDir)) {
-    fs.mkdirSync(videosDir);
+// Set the desired download directory
+// For example: `~/Downloads` for macOS/Linux or `C:/Users/YourUserName/Downloads` for Windows
+const downloadDir = path.resolve(process.env.HOME || process.env.USERPROFILE, 'Downloads');
+
+// Ensure the download directory exists
+if (!fs.existsSync(downloadDir)) {
+    fs.mkdirSync(downloadDir, { recursive: true });
 }
 
-// Clean up old videos (older than 1 hour)
-const cleanupOldVideos = () => {
-    const files = fs.readdirSync(videosDir);
-    const oneHourAgo = Date.now() - (60 * 60 * 1000);
-    
-    files.forEach(file => {
-        const filePath = path.join(videosDir, file);
-        const stats = fs.statSync(filePath);
-        if (stats.mtimeMs < oneHourAgo) {
-            fs.unlinkSync(filePath);
-            console.log(`Cleaned up old video: ${file}`);
-        }
-    });
-};
-
-// Run cleanup every hour
-setInterval(cleanupOldVideos, 60 * 60 * 1000);
+console.log(`Videos will be saved to: ${downloadDir}`);
 
 console.log('Video generation worker started');
 
@@ -55,11 +42,23 @@ videoQueue.process(async (job) => {
         );
         console.log('DeepInfra Response:', response.data);
 
-        const videoUrl = response.data.video_url;
-        console.log(`Job ${job.id} completed with video URL: ${videoUrl}`);
-        return { videoUrl };
+        if (response.data.inference_status.status === 'succeeded') {
+            const videoUrl = response.data.video_url;
+            const base64Data = videoUrl.split(',')[1]; // Extract base64 data
+            const videoPath = path.join(downloadDir, `video_${job.id}.mp4`);
+
+            // Save base64 data as MP4 file
+            fs.writeFileSync(videoPath, base64Data, { encoding: 'base64' });
+            console.log(`Job ${job.id} completed. Video saved at: ${videoPath}`);
+
+            // Return video path as result
+            return { videoPath };
+        } else {
+            console.error(`Job ${job.id} failed:`, response.data.inference_status);
+            throw new Error('Video generation failed');
+        }
     } catch (error) {
-        console.error(`Job ${job.id} failed:`, error);
+        console.error(`Job ${job.id} failed:`, error.message);
         throw error;
     }
 });
