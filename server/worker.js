@@ -29,12 +29,29 @@ videoQueue.process(async (job) => {
             }
         });
 
-        if (!response.data.video_url) {
-            throw new Error('No video URL in response');
-        }
+        // Get the video URL from the response
+        const videoUrl = response.data.video_url;
+        
+        // Download the video as MP4
+        const videoResponse = await axios.get(videoUrl, {
+            responseType: 'arraybuffer'
+        });
 
-        console.log(`Job ${job.id} completed with video URL:`, response.data.video_url);
-        return { downloadUrl: response.data.video_url };
+        // Upload to transfer.sh for downloadable link
+        const uploadResponse = await axios.post('https://transfer.sh/', videoResponse.data, {
+            headers: {
+                'Content-Type': 'video/mp4',
+                'Content-Disposition': `attachment; filename="video_${job.id}.mp4"`
+            }
+        });
+
+        const downloadUrl = uploadResponse.data.trim();
+        console.log(`Job ${job.id} completed with download URL:`, downloadUrl);
+        
+        return { 
+            downloadUrl,
+            fileName: `video_${job.id}.mp4`
+        };
     } catch (error) {
         console.error(`Job ${job.id} failed:`, error);
         throw error;
