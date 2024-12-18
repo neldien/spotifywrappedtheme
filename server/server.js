@@ -294,11 +294,14 @@ app.post('/generate-video', async (req, res) => {
         console.log(`Video generation job ${job.id} added to queue`);
         res.json({ 
             jobId: job.id,
-            message: 'Video generation job enqueued. Check job status later.'
+            message: 'Video generation job enqueued'
         });
     } catch (error) {
         console.error('Error adding job:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ 
+            error: 'Failed to start video generation',
+            details: error.message 
+        });
     }
 });
 
@@ -449,7 +452,7 @@ app.get('/job-status/:jobId', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-});
+
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
