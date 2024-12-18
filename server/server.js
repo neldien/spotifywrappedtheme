@@ -287,20 +287,27 @@ app.post('/generate-music-prompt', async (req, res) => {
 // Start video generation
 app.post('/generate-video', async (req, res) => {
     try {
-        const job = await videoQueue.add({
-            startTime: Date.now()
-        });
-        
-        console.log(`Video generation job ${job.id} added to queue`);
-        res.json({ 
+        // Check if queue is available
+        const isReady = await videoQueue.isReady();
+        if (!isReady) {
+            console.error('Queue is not ready');
+            return res.status(503).json({
+                error: 'Service temporarily unavailable. Please try again in a few moments.'
+            });
+        }
+
+        const job = await videoQueue.add(req.body);
+        console.log(`Job ${job.id} added to the queue`);
+
+        res.status(202).json({
             jobId: job.id,
-            message: 'Video generation job enqueued'
+            message: 'Video generation job enqueued. Check job status later.'
         });
     } catch (error) {
-        console.error('Error adding job:', error);
-        res.status(500).json({ 
+        console.error('Error adding job to queue:', error);
+        res.status(500).json({
             error: 'Failed to start video generation',
-            details: error.message 
+            details: error.message
         });
     }
 });
@@ -453,9 +460,95 @@ app.get('/job-status/:jobId', async (req, res) => {
     }
 });
 
+app.get('/videos/:fileName', (req, res) => {
+    const filePath = path.join(__dirname, 'videos', req.params.fileName);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'Video not found' });
+    }
+
+    // Stream the video file
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize-1;
+        const chunksize = (end-start)+1;
+        const file = fs.createReadStream(filePath, {start, end});
+        const head = {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize,
+            'Content-Type': 'video/mp4',
+        };
+        res.writeHead(206, head);
+        file.pipe(res);
+    } else {
+        const head = {
+            'Content-Length': fileSize,
+            'Content-Type': 'video/mp4',
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(filePath).pipe(res);
+    }
+});
+
+app.get('/view-video/:jobId', async (req, res) => {
+    try {
+        const job = await videoQueue.getJob(req.params.jobId);
+        if (!job || !job.returnvalue?.fileName) {
+            return res.status(404).send('Video not found');
+        }
+
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    <title>Video Viewer</title>
+                    <style>
+                        body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #000; }
+                        video { max-width: 100%; max-height: 100vh; }
+                    </style>
+                </head>
+                <body>
+                    <video controls autoplay loop>
+                        <source src="/videos/${job.returnvalue.fileName}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </body>
+            </html>
+        `);
+    } catch (error) {
+        res.status(500).send('Error loading video: ' + error.message);
+    }
+});
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+});
+
+// Add a health check endpoint
+app.get('/health', async (req, res) => {
+    try {
+        const isReady = await videoQueue.isReady();
+        const counts = await videoQueue.getJobCounts();
+        
+        res.json({
+            status: 'ok',
+            queueReady: isReady,
+            jobCounts: counts,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(503).json({
+            status: 'error',
+            error: error.message
+        });
+    }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
