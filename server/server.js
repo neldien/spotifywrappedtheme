@@ -367,12 +367,36 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
 // Clear queue (for maintenance)
 app.post('/api/clear-queue', async (req, res) => {
     try {
+        // Clear all jobs from queue
         await videoQueue.empty();
+        
+        // Get all jobs (including active and completed)
+        const jobs = await videoQueue.getJobs();
+        
+        // Remove each job
+        for (const job of jobs) {
+            await job.remove();
+        }
+        
         console.log('Queue cleared successfully');
-        res.status(200).json({ message: 'Queue cleared successfully' });
+        res.json({ message: 'Queue cleared successfully' });
     } catch (error) {
-        console.error('Error clearing queue:', error.message);
+        console.error('Error clearing queue:', error);
         res.status(500).json({ error: 'Failed to clear queue' });
+    }
+});
+
+// Get queue status
+app.get('/api/queue-status', async (req, res) => {
+    try {
+        const counts = await videoQueue.getJobCounts();
+        res.json({
+            counts,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error getting queue status:', error);
+        res.status(500).json({ error: 'Failed to get queue status' });
     }
 });
 
