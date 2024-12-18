@@ -116,7 +116,7 @@ function App() {
     } finally {
         setIsGeneratingVideo(false);
     }
-};4
+};
 
   // Add these utility functions
   const clearQueue = async () => {
