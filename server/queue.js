@@ -1,10 +1,12 @@
 const Bull = require('bull');
 require('dotenv').config();
 
-const videoQueue = new Bull('video-generation', process.env.REDIS_URL, {
-  redis: {
-    tls: process.env.REDIS_URL.startsWith('rediss://') ? {} : undefined,
-  },
+const testQueue = new Bull('test-queue', process.env.REDIS_URL, {
+    redis: {
+        tls: {
+            rejectUnauthorized: false
+        }
+    }
 });
 
-module.exports = videoQueue;
+module.exports = testQueue;

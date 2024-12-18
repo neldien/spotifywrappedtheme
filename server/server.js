@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const videoQueue = require('./queue');
+const testQueue = require('./queue');
 const axios = require('axios');
 const cors = require('cors');
 const { OpenAI } = require("openai");
@@ -180,7 +180,7 @@ app.get('/job-status/:id', async (req, res) => {
     const { id } = req.params;
 
     try {
-        const job = await videoQueue.getJob(id);
+        const job = await testQueue.getJob(id);
 
         if (!job) {
             return res.status(404).json({ error: 'Job not found' });
@@ -198,8 +198,8 @@ app.get('/job-status/:id', async (req, res) => {
 
 app.get('/api/queue-status', async (req, res) => {
     try {
-        const counts = await videoQueue.getJobCounts();
-        const isReady = await videoQueue.isReady();
+        const counts = await testQueue.getJobCounts();
+        const isReady = await testQueue.isReady();
         
         res.json({
             status: 'ok',
@@ -296,7 +296,7 @@ app.post('/generate-video', async (req, res) => {
     }
   
     try {
-      const job = await videoQueue.add({ prompt }, { removeOnComplete: true });
+      const job = await testQueue.add({ prompt }, { removeOnComplete: true });
       console.log(`Job ${job.id} added to the queue`);
       res.status(202).json({ jobId: job.id, message: 'Job added to queue' });
     } catch (error) {
@@ -377,14 +377,14 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
 app.post('/api/clear-queue', async (req, res) => {
     try {
         // Check Redis connection first
-        const redisStatus = await videoQueue.client.ping();
+        const redisStatus = await testQueue.client.ping();
         console.log('Redis status:', redisStatus);
 
         if (redisStatus !== 'PONG') {
             throw new Error('Redis is not connected');
         }
 
-        await videoQueue.empty(); // Clear the queue
+        await testQueue.empty(); // Clear the queue
         console.log('Queue cleared successfully');
         res.status(200).json({ message: 'Queue cleared successfully' });
     } catch (error) {
@@ -395,8 +395,8 @@ app.post('/api/clear-queue', async (req, res) => {
 
 app.get('/redis-health', async (req, res) => {
     try {
-        const queueHealth = await videoQueue.checkHealth();
-        const queueCount = await videoQueue.count();
+        const queueHealth = await testQueue.checkHealth();
+        const queueCount = await testQueue.count();
         
         res.json({
             status: 'ok',
@@ -413,6 +413,42 @@ app.get('/redis-health', async (req, res) => {
             error: error.message,
             timestamp: new Date().toISOString()
         });
+    }
+});
+
+// Start a test job
+app.post('/start-test', async (req, res) => {
+    try {
+        const job = await testQueue.add({
+            startTime: Date.now()
+        });
+        
+        console.log(`Test job ${job.id} added to queue`);
+        res.json({ jobId: job.id });
+    } catch (error) {
+        console.error('Error adding job:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Check job status
+app.get('/job-status/:jobId', async (req, res) => {
+    try {
+        const job = await testQueue.getJob(req.jobId);
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        const state = await job.getState();
+        const result = job.returnvalue;
+
+        res.json({
+            id: job.id,
+            state,
+            result
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
