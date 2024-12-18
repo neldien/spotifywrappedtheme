@@ -4,13 +4,29 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-// Temporary directory to store downloaded videos
+// Create videos directory if it doesn't exist
 const videosDir = path.join(__dirname, 'videos');
-
-// Ensure the directory exists
 if (!fs.existsSync(videosDir)) {
-    fs.mkdirSync(videosDir, { recursive: true });
+    fs.mkdirSync(videosDir);
 }
+
+// Clean up old videos (older than 1 hour)
+const cleanupOldVideos = () => {
+    const files = fs.readdirSync(videosDir);
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    
+    files.forEach(file => {
+        const filePath = path.join(videosDir, file);
+        const stats = fs.statSync(filePath);
+        if (stats.mtimeMs < oneHourAgo) {
+            fs.unlinkSync(filePath);
+            console.log(`Cleaned up old video: ${file}`);
+        }
+    });
+};
+
+// Run cleanup every hour
+setInterval(cleanupOldVideos, 60 * 60 * 1000);
 
 console.log('Video generation worker started');
 
@@ -37,34 +53,11 @@ videoQueue.process(async (job) => {
                 },
             }
         );
-
         console.log('DeepInfra Response:', response.data);
 
-        if (response.data.inference_status.status === 'succeeded') {
-            const videoUrl = response.data.video_url;
-            const videoFilePath = path.join(videosDir, `job-${job.id}.mp4`);
-
-            console.log(`Downloading video for job ${job.id}...`);
-            const videoResponse = await axios({
-                method: 'GET',
-                url: videoUrl,
-                responseType: 'stream',
-            });
-
-            const writer = fs.createWriteStream(videoFilePath);
-            videoResponse.data.pipe(writer);
-
-            await new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
-                writer.on('error', reject);
-            });
-
-            console.log(`Job ${job.id} completed, video saved: ${videoFilePath}`);
-
-            return { filePath: `/videos/job-${job.id}.mp4` };
-        } else {
-            throw new Error(`Job ${job.id} failed: ${response.data.inference_status.status}`);
-        }
+        const videoUrl = response.data.video_url;
+        console.log(`Job ${job.id} completed with video URL: ${videoUrl}`);
+        return { videoUrl };
     } catch (error) {
         console.error(`Job ${job.id} failed:`, error);
         throw error;
