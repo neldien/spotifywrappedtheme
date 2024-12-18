@@ -249,10 +249,13 @@ app.post('/generate-video-prompt', async (req, res) => {
         });
 
         const optimizedPrompt = response.choices[0].message.content;
-        res.json({ optimizedPrompt });
+
+        // Add job to the queue with the optimized prompt
+        const job = await videoQueue.add({ prompt: optimizedPrompt });
+        res.json({ jobId: job.id, optimizedPrompt });
     } catch (error) {
-        console.error('Error optimizing video prompt:', error.message);
-        res.status(500).json({ error: "Failed to optimize video prompt" });
+        console.error('Error generating video prompt:', error.message);
+        res.status(500).json({ error: "Failed to generate video prompt" });
     }
 });
 
@@ -314,14 +317,15 @@ app.post('/generate-summary', async (req, res) => {
             Summarize my music taste in a fun, creative way. 
             My favorite artists are: ${artistNames}. 
             My favorite tracks are: ${trackNames}. 
-            Describe the energy, vibe, and themes of this music taste. 
-            Keep it under 150 words, dont feel the need to use all the artists or tracks. i dont want to be overwhelmed. feel free to break it into paragraphs and what not.
+            Describe the energy, vibe, and themes of this music taste. be colorful and descriptive. 
+            Keep it under 100 words, only use a few of the artists and tracks names.
+             i dont want to be overwhelmed. feel free to break it into paragraphs and what not.
         `;
 
         const response = await openai.chat.completions.create({
             model: 'gpt-4o',
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 400,
+            max_tokens: 250,
         });
 
         const summary = response.choices[0].message.content;
@@ -343,7 +347,7 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
                 {
                     role: "user",
                     content: [
-                        { type: "text", text: "Describe this image in an accurate way, including physical features of the individual, so that it can be used in a video prompt. be concise" },
+                        { type: "text", text: "Describe this image in an accurate way, including physical features of the individual, so that it can be used in a video prompt. be concise, do it in less than 50 words" },
                         {
                             type: "image_url",
                             image_url: {
