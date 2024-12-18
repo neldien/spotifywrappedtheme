@@ -82,38 +82,59 @@ function App() {
   };
 
   const generateAndDownloadVideo = async () => {
+    if (!generatedSummary) {
+        alert('Please wait for the music summary to be generated first.');
+        return;
+    }
+
     setIsGeneratingVideo(true);
-    console.log('Starting video generation...');
 
     try {
-        const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`, { imagePrompt: imageDescription });
-        console.log(`Job ${jobData.jobId} enqueued`);
-
+        // Start the job
+        const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`);
+        
+        // Poll for completion
         while (true) {
             const { data: status } = await axios.get(`${API_BASE_URL}/job-status/${jobData.jobId}`);
             
-            if (status.state === 'completed' && status.result) {
-                console.log('Video generation completed. Downloading video...');
+            if (status.state === 'completed' && status.result?.videoData) {
+                // Create blob from base64 data
+                const blob = new Blob(
+                    [Uint8Array.from(atob(status.result.videoData), c => c.charCodeAt(0))],
+                    { type: status.result.contentType }
+                );
                 
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
-                link.href = `${API_BASE_URL}${status.result.url}`;
+                link.href = url;
                 link.download = status.result.fileName;
                 document.body.appendChild(link);
                 link.click();
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
                 document.body.removeChild(link);
+                
+                // Stop polling and reset state
+                setIsGeneratingVideo(false);
                 break;
             }
-
+            
             if (status.state === 'failed') {
                 throw new Error('Video generation failed');
             }
-
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Only continue polling if job is not completed
+            if (status.state !== 'completed') {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+                break;
+            }
         }
     } catch (error) {
-        console.error('Error during video generation:', error.message);
-        alert('Failed to generate video. Please try again.');
-    } finally {
+        console.error('Error:', error);
+        alert('Failed to generate video: ' + error.message);
         setIsGeneratingVideo(false);
     }
 };
