@@ -139,31 +139,31 @@ function App() {
     }
 };
 
-  // Add these utility functions
-  const clearQueue = async () => {
-    try {
-        await axios.post(`${API_BASE_URL}/api/clear-queue`);
-        console.log('Queue cleared successfully');
-    } catch (error) {
-        console.error('Failed to clear queue:', error);
-        alert('Failed to clear queue: ' + error.message);
-    }
-  };
+// Add these utility functions
+const clearQueue = async () => {
+  try {
+      await axios.post(`${API_BASE_URL}/api/clear-queue`);
+      console.log('Queue cleared successfully');
+  } catch (error) {
+      console.error('Failed to clear queue:', error);
+      alert('Failed to clear queue: ' + error.message);
+  }
+};
 
-  const checkQueueStatus = async () => {
-    try {
-        const { data } = await axios.get(`${API_BASE_URL}/api/queue-status`);
-        console.log('Queue status:', data);
-        return data;
-    } catch (error) {
-        console.error('Failed to get queue status:', error);
-        return null;
-    }
-  };
+const checkQueueStatus = async () => {
+  try {
+      const { data } = await axios.get(`${API_BASE_URL}/api/queue-status`);
+      console.log('Queue status:', data);
+      return data;
+  } catch (error) {
+      console.error('Failed to get queue status:', error);
+      return null;
+  }
+};
 
-  // You can call these functions from the console:
-  // await clearQueue()
-  // await checkQueueStatus()
+// Make functions available globally
+window.clearQueue = clearQueue;
+window.checkQueueStatus = checkQueueStatus;
 
   return (
     <div className="app-container">
