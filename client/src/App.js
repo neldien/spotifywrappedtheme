@@ -82,18 +82,26 @@ function App() {
   };
 
   const generateAndDownloadVideo = async () => {
-    if (!generatedSummary) {
-        alert('Please wait for the music summary to be generated first.');
+    if (!generatedSummary || !imageDescription) {
+        alert('Please ensure both the music summary and image description are generated.');
         return;
     }
 
     setIsGeneratingVideo(true);
-    console.log('Starting video generation with prompt:', generatedSummary);
+    console.log('Starting video generation with music summary and image description.');
 
     try {
-        // Start job with prompt
+        // Get the optimized prompt
+        const { data: promptData } = await axios.post(`${API_BASE_URL}/generate-video-prompt`, {
+            musicSummary: generatedSummary,
+            imageDescription
+        });
+
+        const { optimizedPrompt } = promptData;
+
+        // Start job with optimized prompt
         const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`, {
-            prompt: generatedSummary
+            prompt: optimizedPrompt
         });
 
         // Poll for completion
@@ -103,7 +111,6 @@ function App() {
             if (status.state === 'completed' && status.videoUrl) {
                 console.log('Video generation completed, starting download...');
 
-                // Direct download from URL
                 const link = document.createElement('a');
                 link.href = status.videoUrl;
                 link.download = 'music_summary_video.mp4';
@@ -127,31 +134,6 @@ function App() {
     }
 };
 
-// Add these utility functions
-const clearQueue = async () => {
-  try {
-      await axios.post(`${API_BASE_URL}/api/clear-queue`);
-      console.log('Queue cleared successfully');
-  } catch (error) {
-      console.error('Failed to clear queue:', error);
-      alert('Failed to clear queue: ' + error.message);
-  }
-};
-
-const checkQueueStatus = async () => {
-  try {
-      const { data } = await axios.get(`${API_BASE_URL}/api/queue-status`);
-      console.log('Queue status:', data);
-      return data;
-  } catch (error) {
-      console.error('Failed to get queue status:', error);
-      return null;
-  }
-};
-
-// Make functions available globally
-window.clearQueue = clearQueue;
-window.checkQueueStatus = checkQueueStatus;
 
   return (
     <div className="app-container">
