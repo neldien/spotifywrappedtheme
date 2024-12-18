@@ -289,21 +289,18 @@ app.post('/generate-music-prompt', async (req, res) => {
 });
 
 app.post('/generate-video', async (req, res) => {
-    const { prompt } = req.body;
-  
-    if (!prompt) {
-      return res.status(400).json({ error: "The 'prompt' field is required." });
-    }
-  
     try {
-      const job = await testQueue.add({ prompt }, { removeOnComplete: true });
-      console.log(`Job ${job.id} added to the queue`);
-      res.status(202).json({ jobId: job.id, message: 'Job added to queue' });
+        const job = await videoQueue.add({
+            startTime: Date.now()
+        });
+        
+        console.log(`Video generation job ${job.id} added to queue`);
+        res.json({ jobId: job.id });
     } catch (error) {
-      console.error('Error adding job:', error.message);
-      res.status(500).json({ error: 'Failed to enqueue job' });
+        console.error('Error adding job:', error);
+        res.status(500).json({ error: error.message });
     }
-  });
+});
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
@@ -434,7 +431,7 @@ app.post('/start-test', async (req, res) => {
 // Check job status
 app.get('/job-status/:jobId', async (req, res) => {
     try {
-        const job = await testQueue.getJob(req.jobId);
+        const job = await videoQueue.getJob(req.params.jobId);
         if (!job) {
             return res.status(404).json({ error: 'Job not found' });
         }
@@ -445,9 +442,12 @@ app.get('/job-status/:jobId', async (req, res) => {
         res.json({
             id: job.id,
             state,
-            result
+            result,
+            startedAt: new Date(job.data.startTime).toISOString(),
+            currentTime: new Date().toISOString()
         });
     } catch (error) {
+        console.error('Status check error:', error);
         res.status(500).json({ error: error.message });
     }
 });
