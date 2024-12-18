@@ -53,6 +53,7 @@ videoQueue.process(async (job) => {
                 },
             }
         );
+        console.log('DeepInfra Response:', response.data);
 
         const videoUrl = response.data.video_url;
         console.log(`Job ${job.id} completed with video URL: ${videoUrl}`);
