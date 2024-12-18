@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const testQueue = require('./queue');
+const videoQueue = require('./queue');
 const axios = require('axios');
 const cors = require('cors');
 const { OpenAI } = require("openai");
@@ -198,8 +198,8 @@ app.get('/job-status/:id', async (req, res) => {
 
 app.get('/api/queue-status', async (req, res) => {
     try {
-        const counts = await testQueue.getJobCounts();
-        const isReady = await testQueue.isReady();
+        const counts = await videoQueue.getJobCounts();
+        const isReady = await videoQueue.isReady();
         
         res.json({
             status: 'ok',
@@ -218,10 +218,6 @@ app.get('/api/queue-status', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     }
-});
-
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
 // Endpoint to Generate Prompts
@@ -288,6 +284,7 @@ app.post('/generate-music-prompt', async (req, res) => {
     }
 });
 
+// Start video generation
 app.post('/generate-video', async (req, res) => {
     try {
         const job = await videoQueue.add({
@@ -295,16 +292,16 @@ app.post('/generate-video', async (req, res) => {
         });
         
         console.log(`Video generation job ${job.id} added to queue`);
-        res.json({ jobId: job.id });
+        res.json({ 
+            jobId: job.id,
+            message: 'Video generation job enqueued. Check job status later.'
+        });
     } catch (error) {
         console.error('Error adding job:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT}`);
-});
 // Generate Music Summary with ChatGPT
 app.post('/generate-summary', async (req, res) => {
     const { topArtists, topTracks } = req.body;
@@ -428,6 +425,7 @@ app.post('/start-test', async (req, res) => {
     }
 });
 
+
 // Check job status
 app.get('/job-status/:jobId', async (req, res) => {
     try {
@@ -450,6 +448,15 @@ app.get('/job-status/:jobId', async (req, res) => {
         console.error('Status check error:', error);
         res.status(500).json({ error: error.message });
     }
+});
+});
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT}`);
 });
 
 
