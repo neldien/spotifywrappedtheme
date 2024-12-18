@@ -72,6 +72,15 @@ function App() {
   };
 
   // Generate a Music Taste Summary
+  const generateSummary = async (summaryData) => {
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/generate-summary`, summaryData);
+      setGeneratedSummary(data.summary);
+    } catch (error) {
+      console.error('Error generating summary:', error.message);
+    }
+  };
+
   const generateAndDownloadVideo = async () => {
     if (!generatedSummary || !imageDescription) {
         alert('Please ensure both the music summary and image description are generated.');
@@ -128,6 +137,7 @@ function App() {
         setIsGeneratingVideo(false);
     }
 };
+
   return (
     <div className="app-container">
       <h1>Spotify Music Taste Summary</h1>
