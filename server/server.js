@@ -447,13 +447,39 @@ app.get('/job-status/:jobId', async (req, res) => {
         const state = await job.getState();
         const result = job.returnvalue;
 
-        res.json({
-            id: job.id,
-            state,
-            result,
-            startedAt: new Date(job.data.startTime).toISOString(),
-            currentTime: new Date().toISOString()
-        });
+        if (state === 'completed' && result?.downloadUrl) {
+            res.send(`
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <title>Download Video</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+                            .download-btn { 
+                                display: inline-block;
+                                padding: 10px 20px;
+                                background: #4CAF50;
+                                color: white;
+                                text-decoration: none;
+                                border-radius: 5px;
+                                margin: 20px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h2>Your video is ready!</h2>
+                        <a href="${result.downloadUrl}" class="download-btn" download>Download Video</a>
+                    </body>
+                </html>
+            `);
+        } else {
+            res.json({
+                id: job.id,
+                state,
+                result,
+                currentTime: new Date().toISOString()
+            });
+        }
     } catch (error) {
         console.error('Status check error:', error);
         res.status(500).json({ error: error.message });
