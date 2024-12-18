@@ -97,13 +97,23 @@ function App() {
         while (true) {
             const { data: status } = await axios.get(`${API_BASE_URL}/job-status/${jobData.jobId}`);
             
-            if (status.state === 'completed' && status.downloadUrl) {
-                // Create and click a download link
+            if (status.state === 'completed' && status.result?.videoData) {
+                // Create blob from base64 data
+                const blob = new Blob(
+                    [Uint8Array.from(atob(status.result.videoData), c => c.charCodeAt(0))],
+                    { type: status.result.contentType }
+                );
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
-                link.href = status.downloadUrl;
-                link.download = status.fileName || 'generated-video.mp4';
+                link.href = url;
+                link.download = status.result.fileName;
                 document.body.appendChild(link);
                 link.click();
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
                 document.body.removeChild(link);
                 
                 // Stop polling and reset state
