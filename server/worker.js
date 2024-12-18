@@ -4,16 +4,13 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-// Set the desired download directory
-// For example: `~/Downloads` for macOS/Linux or `C:/Users/YourUserName/Downloads` for Windows
-const downloadDir = path.resolve(process.env.HOME || process.env.USERPROFILE, 'Downloads');
+// Temporary directory to store downloaded videos
+const videosDir = path.join(__dirname, 'videos');
 
-// Ensure the download directory exists
-if (!fs.existsSync(downloadDir)) {
-    fs.mkdirSync(downloadDir, { recursive: true });
+// Ensure the directory exists
+if (!fs.existsSync(videosDir)) {
+    fs.mkdirSync(videosDir, { recursive: true });
 }
-
-console.log(`Videos will be saved to: ${downloadDir}`);
 
 console.log('Video generation worker started');
 
@@ -40,25 +37,36 @@ videoQueue.process(async (job) => {
                 },
             }
         );
+
         console.log('DeepInfra Response:', response.data);
 
         if (response.data.inference_status.status === 'succeeded') {
             const videoUrl = response.data.video_url;
-            const base64Data = videoUrl.split(',')[1]; // Extract base64 data
-            const videoPath = path.join(downloadDir, `video_${job.id}.mp4`);
+            const videoFilePath = path.join(videosDir, `job-${job.id}.mp4`);
 
-            // Save base64 data as MP4 file
-            fs.writeFileSync(videoPath, base64Data, { encoding: 'base64' });
-            console.log(`Job ${job.id} completed. Video saved at: ${videoPath}`);
+            console.log(`Downloading video for job ${job.id}...`);
+            const videoResponse = await axios({
+                method: 'GET',
+                url: videoUrl,
+                responseType: 'stream',
+            });
 
-            // Return video path as result
-            return { videoPath };
+            const writer = fs.createWriteStream(videoFilePath);
+            videoResponse.data.pipe(writer);
+
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+
+            console.log(`Job ${job.id} completed, video saved: ${videoFilePath}`);
+
+            return { filePath: `/videos/job-${job.id}.mp4` };
         } else {
-            console.error(`Job ${job.id} failed:`, response.data.inference_status);
-            throw new Error('Video generation failed');
+            throw new Error(`Job ${job.id} failed: ${response.data.inference_status.status}`);
         }
     } catch (error) {
-        console.error(`Job ${job.id} failed:`, error.message);
+        console.error(`Job ${job.id} failed:`, error);
         throw error;
     }
 });

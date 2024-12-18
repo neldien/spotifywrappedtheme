@@ -72,15 +72,6 @@ function App() {
   };
 
   // Generate a Music Taste Summary
-  const generateSummary = async (summaryData) => {
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/generate-summary`, summaryData);
-      setGeneratedSummary(data.summary);
-    } catch (error) {
-      console.error('Error generating summary:', error.message);
-    }
-  };
-
   const generateAndDownloadVideo = async () => {
     if (!generatedSummary || !imageDescription) {
         alert('Please ensure both the music summary and image description are generated.');
@@ -104,8 +95,11 @@ function App() {
             prompt: optimizedPrompt
         });
 
-        // Poll for completion
+        console.log(`Job started with ID: ${jobData.jobId}`);
+
+        // Poll for completion every minute
         while (true) {
+            console.log(`Polling status for job ID: ${jobData.jobId}`);
             const { data: status } = await axios.get(`${API_BASE_URL}/job-status/${jobData.jobId}`);
 
             if (status.state === 'completed' && status.videoUrl) {
@@ -124,7 +118,8 @@ function App() {
                 throw new Error('Video generation failed');
             }
 
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            console.log(`Job ${jobData.jobId} is still in progress. Retrying in 1 minute.`);
+            await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute
         }
     } catch (error) {
         console.error('Video generation failed:', error);
@@ -133,8 +128,6 @@ function App() {
         setIsGeneratingVideo(false);
     }
 };
-
-
   return (
     <div className="app-container">
       <h1>Spotify Music Taste Summary</h1>
