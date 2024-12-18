@@ -180,7 +180,7 @@ app.get('/job-status/:id', async (req, res) => {
     const { id } = req.params;
 
     try {
-        const job = await testQueue.getJob(id);
+        const job = await videoQueue.getJob(id);
 
         if (!job) {
             return res.status(404).json({ error: 'Job not found' });
@@ -287,27 +287,20 @@ app.post('/generate-music-prompt', async (req, res) => {
 // Start video generation
 app.post('/generate-video', async (req, res) => {
     try {
-        // Check if queue is available
-        const isReady = await videoQueue.isReady();
-        if (!isReady) {
-            console.error('Queue is not ready');
-            return res.status(503).json({
-                error: 'Service temporarily unavailable. Please try again in a few moments.'
-            });
-        }
-
-        const job = await videoQueue.add(req.body);
-        console.log(`Job ${job.id} added to the queue`);
-
-        res.status(202).json({
+        const job = await videoQueue.add({
+            startTime: Date.now()
+        });
+        
+        console.log(`Video generation job ${job.id} added to queue`);
+        res.json({ 
             jobId: job.id,
-            message: 'Video generation job enqueued. Check job status later.'
+            message: 'Video generation job enqueued'
         });
     } catch (error) {
-        console.error('Error adding job to queue:', error);
-        res.status(500).json({
+        console.error('Error adding job:', error);
+        res.status(500).json({ 
             error: 'Failed to start video generation',
-            details: error.message
+            details: error.message 
         });
     }
 });
@@ -378,17 +371,10 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
     }
 });
 
+// Clear queue (for maintenance)
 app.post('/api/clear-queue', async (req, res) => {
     try {
-        // Check Redis connection first
-        const redisStatus = await testQueue.client.ping();
-        console.log('Redis status:', redisStatus);
-
-        if (redisStatus !== 'PONG') {
-            throw new Error('Redis is not connected');
-        }
-
-        await testQueue.empty(); // Clear the queue
+        await videoQueue.empty();
         console.log('Queue cleared successfully');
         res.status(200).json({ message: 'Queue cleared successfully' });
     } catch (error) {
@@ -396,45 +382,6 @@ app.post('/api/clear-queue', async (req, res) => {
         res.status(500).json({ error: 'Failed to clear queue' });
     }
 });
-
-app.get('/redis-health', async (req, res) => {
-    try {
-        const queueHealth = await testQueue.checkHealth();
-        const queueCount = await testQueue.count();
-        
-        res.json({
-            status: 'ok',
-            redis: {
-                connected: true,
-                url: process.env.REDIS_URL.split('@')[1], // Safe logging
-                jobsCount: queueCount
-            },
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            error: error.message,
-            timestamp: new Date().toISOString()
-        });
-    }
-});
-
-// Start a test job
-app.post('/start-test', async (req, res) => {
-    try {
-        const job = await testQueue.add({
-            startTime: Date.now()
-        });
-        
-        console.log(`Test job ${job.id} added to queue`);
-        res.json({ jobId: job.id });
-    } catch (error) {
-        console.error('Error adding job:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
 
 // Check job status
 app.get('/job-status/:jobId', async (req, res) => {
@@ -557,7 +504,7 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
-// Add a health check endpoint
+// Health check endpoint
 app.get('/health', async (req, res) => {
     try {
         const isReady = await videoQueue.isReady();
