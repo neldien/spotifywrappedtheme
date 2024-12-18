@@ -286,18 +286,22 @@ app.post('/generate-music-prompt', async (req, res) => {
 
 // Start video generation
 app.post('/generate-video', async (req, res) => {
-    const { imagePrompt } = req.body;
+    const { prompt } = req.body;
+
+    if (!prompt) {
+        console.error("Invalid or missing 'prompt'");
+        return res.status(400).json({ error: "The 'prompt' field is required." });
+    }
 
     try {
-        const job = await videoQueue.add({ imagePrompt });
-        console.log(`Video generation job ${job.id} added to the queue`);
-        res.status(202).json({ jobId: job.id });
+        const job = await videoQueue.add({ prompt });
+        console.log(`Video generation job ${job.id} started`);
+        res.json({ jobId: job.id });
     } catch (error) {
-        console.error('Error adding job to queue:', error.message);
-        res.status(500).json({ error: 'Failed to enqueue job' });
+        console.error('Error starting video generation:', error);
+        res.status(500).json({ error: error.message });
     }
 });
-
 // Generate Music Summary with ChatGPT
 app.post('/generate-summary', async (req, res) => {
     const { topArtists, topTracks } = req.body;
@@ -412,12 +416,19 @@ app.get('/job-status/:jobId', async (req, res) => {
         const state = await job.getState();
         const result = job.returnvalue;
 
-        res.json({
-            state,
-            result: result ? { fileName: result.fileName, url: `/videos/${result.fileName}` } : null,
-        });
+        if (state === 'completed' && result?.videoUrl) {
+            res.json({
+                state,
+                videoUrl: result.videoUrl
+            });
+        } else {
+            res.json({
+                state,
+                message: 'Video is still being processed'
+            });
+        }
     } catch (error) {
-        console.error('Error checking job status:', error.message);
+        console.error('Status check error:', error);
         res.status(500).json({ error: error.message });
     }
 });
