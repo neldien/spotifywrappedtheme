@@ -19,7 +19,8 @@ const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
-
+const videosDir = path.join(__dirname, 'videos');
+app.use('/videos', express.static(videosDir));
 
 const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:3000'];
 
