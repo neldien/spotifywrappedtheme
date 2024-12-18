@@ -394,36 +394,18 @@ app.get('/job-status/:jobId', async (req, res) => {
         const state = await job.getState();
         const result = job.returnvalue;
 
-        if (state === 'completed' && result?.downloadUrl) {
-            res.send(`
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <title>Download Video</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-                            .download-btn { 
-                                display: inline-block;
-                                padding: 10px 20px;
-                                background: #4CAF50;
-                                color: white;
-                                text-decoration: none;
-                                border-radius: 5px;
-                                margin: 20px;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <h2>Your video is ready!</h2>
-                        <a href="${result.downloadUrl}" class="download-btn" download>Download Video</a>
-                    </body>
-                </html>
-            `);
+        if (state === 'completed' && result?.videoData) {
+            // Set headers for file download
+            res.setHeader('Content-Type', result.contentType);
+            res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+            
+            // Send the base64 data as binary
+            const buffer = Buffer.from(result.videoData, 'base64');
+            res.send(buffer);
         } else {
             res.json({
                 id: job.id,
                 state,
-                result,
                 currentTime: new Date().toISOString()
             });
         }

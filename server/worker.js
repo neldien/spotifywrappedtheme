@@ -29,28 +29,13 @@ videoQueue.process(async (job) => {
             }
         });
 
-        // Get the video URL from the response
-        const videoUrl = response.data.video_url;
-        
-        // Download the video as MP4
-        const videoResponse = await axios.get(videoUrl, {
-            responseType: 'arraybuffer'
-        });
-
-        // Upload to transfer.sh for downloadable link
-        const uploadResponse = await axios.post('https://transfer.sh/', videoResponse.data, {
-            headers: {
-                'Content-Type': 'video/mp4',
-                'Content-Disposition': `attachment; filename="video_${job.id}.mp4"`
-            }
-        });
-
-        const downloadUrl = uploadResponse.data.trim();
-        console.log(`Job ${job.id} completed with download URL:`, downloadUrl);
+        // The video_url is actually a base64 string
+        const base64Data = response.data.video_url.split(',')[1]; // Remove the data:video/mp4;base64, prefix
         
         return { 
-            downloadUrl,
-            fileName: `video_${job.id}.mp4`
+            videoData: base64Data,
+            fileName: `video_${job.id}.mp4`,
+            contentType: 'video/mp4'
         };
     } catch (error) {
         console.error(`Job ${job.id} failed:`, error);
