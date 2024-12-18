@@ -31,46 +31,36 @@ setInterval(cleanupOldVideos, 60 * 60 * 1000);
 console.log('Video generation worker started');
 
 videoQueue.process(async (job) => {
-    console.log(`Starting video generation job ${job.id}`);
-    
+    const { imagePrompt } = job.data;
+
     try {
-        const apiUrl = "https://api.deepinfra.com/v1/inference/genmo/mochi-1-preview";
+        console.log(`Starting job ${job.id} with prompt: ${imagePrompt}`);
+        console.log('Sending request to DeepInfra API...');
         
-        const requestBody = {
-            prompt: "A beautiful sunset over the ocean",
-            width: 848,
-            height: 480,
-            duration: 4.0,
-            num_inference_steps: 50,
-            cfg_scale: 4.5,
-            seed: 12345
-        };
+        const response = await axios.post(
+            'https://api.deepinfra.com/v1/inference/genmo/mochi-1-preview',
+            { prompt: imagePrompt, width: 1280, height: 720, duration: 5.1 },
+            { headers: { Authorization: `Bearer ${process.env.DEEPINFRA_API_KEY}` } }
+        );
+        
+        console.log(`API response for job ${job.id}:`, response.data);
 
-        console.log(`Sending request to DeepInfra API for job ${job.id}...`);
-        
-        const response = await axios.post(apiUrl, requestBody, {
-            headers: {
-                "Authorization": `Bearer ${process.env.DEEPINFRA_API_KEY}`,
-                "Content-Type": "application/json"
-            }
-        });
+        if (!response.data.video_url) {
+            throw new Error('Video URL missing from response');
+        }
 
-        // The video_url is actually a base64 string
-        const base64Data = response.data.video_url.split(',')[1];
-        const fileName = `video_${job.id}.mp4`;
-        const filePath = path.join(videosDir, fileName);
-        
-        // Save the video file
-        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-        console.log(`Saved video to ${filePath}`);
-        
-        return { 
-            fileName,
-            filePath,
-            contentType: 'video/mp4'
-        };
+        const videoUrl = response.data.video_url;
+        const fileName = `video-${job.id}.mp4`;
+        console.log(`Downloading video for job ${job.id} from ${videoUrl}`);
+
+        const videoResponse = await axios.get(videoUrl, { responseType: 'arraybuffer' });
+        const filePath = path.join(__dirname, 'videos', fileName);
+        fs.writeFileSync(filePath, videoResponse.data);
+
+        console.log(`Video for job ${job.id} saved as ${fileName}`);
+        return { fileName };
     } catch (error) {
-        console.error(`Job ${job.id} failed:`, error);
+        console.error(`Job ${job.id} failed:`, error.message);
         throw error;
     }
 });
