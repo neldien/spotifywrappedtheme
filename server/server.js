@@ -394,18 +394,25 @@ app.get('/job-status/:jobId', async (req, res) => {
         const state = await job.getState();
         const result = job.returnvalue;
 
-        if (state === 'completed' && result?.videoData) {
-            // Set headers for file download
-            res.setHeader('Content-Type', result.contentType);
-            res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        if (state === 'completed' && result?.fileName) {
+            const filePath = path.join(__dirname, 'videos', result.fileName);
             
-            // Send the base64 data as binary
-            const buffer = Buffer.from(result.videoData, 'base64');
-            res.send(buffer);
+            if (fs.existsSync(filePath)) {
+                res.json({
+                    id: job.id,
+                    state,
+                    downloadUrl: `/videos/${result.fileName}`,
+                    viewUrl: `/view-video/${job.id}`,
+                    completed: true
+                });
+            } else {
+                res.status(404).json({ error: 'Video file not found' });
+            }
         } else {
             res.json({
                 id: job.id,
                 state,
+                completed: false,
                 currentTime: new Date().toISOString()
             });
         }
