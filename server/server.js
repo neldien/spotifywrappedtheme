@@ -286,17 +286,15 @@ app.post('/generate-music-prompt', async (req, res) => {
 
 // Start video generation
 app.post('/generate-video', async (req, res) => {
+    const { imagePrompt } = req.body;
+
     try {
-        const job = await videoQueue.add({
-            imagePrompt: req.body.imagePrompt,
-            startTime: Date.now()
-        });
-        
-        console.log(`Video generation job ${job.id} started`);
-        res.json({ jobId: job.id });
+        const job = await videoQueue.add({ imagePrompt });
+        console.log(`Video generation job ${job.id} added to the queue`);
+        res.status(202).json({ jobId: job.id });
     } catch (error) {
-        console.error('Error starting video generation:', error);
-        res.status(500).json({ error: error.message });
+        console.error('Error adding job to queue:', error.message);
+        res.status(500).json({ error: 'Failed to enqueue job' });
     }
 });
 
@@ -379,6 +377,7 @@ app.post('/api/clear-queue', async (req, res) => {
 });
 
 // Check job status
+
 app.get('/job-status/:jobId', async (req, res) => {
     try {
         const job = await videoQueue.getJob(req.params.jobId);
@@ -386,12 +385,15 @@ app.get('/job-status/:jobId', async (req, res) => {
             return res.status(404).json({ error: 'Job not found' });
         }
 
+        const state = await job.getState();
+        const result = job.returnvalue;
+
         res.json({
-            state: await job.getState(),
-            result: job.returnvalue
+            state,
+            result: result ? { fileName: result.fileName, url: `/videos/${result.fileName}` } : null,
         });
     } catch (error) {
-        console.error('Status check error:', error);
+        console.error('Error checking job status:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
