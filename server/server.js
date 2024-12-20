@@ -22,7 +22,7 @@ const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
 const videosDir = path.join(__dirname, 'videos');
 app.use('/videos', express.static(videosDir));
 
-const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:3000'];
+const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:5001'];
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -298,11 +298,22 @@ app.post('/generate-video', async (req, res) => {
     }
 
     try {
+        // Add job to the queue and wait for completion
         const job = await videoQueue.add({ prompt });
-        console.log(`Video generation job ${job.id} started`);
-        res.json({ jobId: job.id });
+
+        // Wait for the job to complete
+        const completedJob = await new Promise((resolve, reject) => {
+            job.on('completed', resolve);
+            job.on('failed', reject);
+        });
+
+        // Assuming the job returns the file path of the video
+        const videoFilePath = path.join(__dirname, 'videos', completedJob.returnvalue.fileName);
+
+        // Send the video file as a response
+        res.sendFile(videoFilePath);
     } catch (error) {
-        console.error('Error starting video generation:', error);
+        console.error('Error generating video:', error);
         res.status(500).json({ error: error.message });
     }
 });

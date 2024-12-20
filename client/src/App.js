@@ -11,7 +11,6 @@ function App() {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const API_BASE_URL = process.env.REACT_APP_API_URL;
-  const [videoFileName, setVideoFileName] = useState('');
   const [videoPreviewUrl, setVideoPreviewUrl] = useState('');
 
 
@@ -102,30 +101,25 @@ function App() {
 
         const { optimizedPrompt } = promptData;
 
-        // Start job with optimized prompt
-        const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`, {
+        // Request video generation and download the video
+        const response = await axios.post(`${API_BASE_URL}/generate-video`, {
             prompt: optimizedPrompt
-        });
+        }, { responseType: 'blob' });
 
-        // Poll for completion
-        while (true) {
-            const { data: status } = await axios.get(`${API_BASE_URL}/job-status/${jobData.jobId}`);
+        // Create a URL for the video blob
+        const videoBlob = new Blob([response.data], { type: 'video/mp4' });
+        const videoUrl = URL.createObjectURL(videoBlob);
 
-            if (status.state === 'completed' && status.fileName) {
-                console.log('Video generation completed, preparing to preview...');
+        // Trigger download
+        const link = document.createElement('a');
+        link.href = videoUrl;
+        link.download = 'generated_video.mp4';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
-                // Set the video preview URL
-                setVideoFileName(status.fileName);
-                setVideoPreviewUrl(`${API_BASE_URL}/videos/${status.fileName}`);
-                break;
-            }
-
-            if (status.state === 'failed') {
-                throw new Error('Video generation failed');
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+        // Revoke the object URL after download
+        URL.revokeObjectURL(videoUrl);
     } catch (error) {
         console.error('Video generation failed:', error);
         alert('Failed to generate video: ' + error.message);
