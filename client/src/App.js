@@ -11,6 +11,8 @@ function App() {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const API_BASE_URL = process.env.REACT_APP_API_URL;
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState('');
+
 
   // Extract access token from URL
   useEffect(() => {
@@ -104,22 +106,16 @@ function App() {
             prompt: optimizedPrompt
         });
 
-        console.log(`Job started with ID: ${jobData.jobId}`);
-
-        // Poll for completion every minute
+        // Poll for completion
         while (true) {
-            console.log(`Polling status for job ID: ${jobData.jobId}`);
             const { data: status } = await axios.get(`${API_BASE_URL}/job-status/${jobData.jobId}`);
 
-            if (status.state === 'completed' && status.videoUrl) {
-                console.log('Video generation completed, starting download...');
+            if (status.state === 'completed' && status.fileName) {
+                console.log('Video generation completed, preparing to preview...');
 
-                const link = document.createElement('a');
-                link.href = status.videoUrl;
-                link.download = 'music_summary_video.mp4';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // Set the video preview URL
+                setVideoFileName(status.fileName);
+                setVideoPreviewUrl(`${API_BASE_URL}/videos/${status.fileName}`);
                 break;
             }
 
@@ -127,8 +123,7 @@ function App() {
                 throw new Error('Video generation failed');
             }
 
-            console.log(`Job ${jobData.jobId} is still in progress. Retrying in 1 minute.`);
-            await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
     } catch (error) {
         console.error('Video generation failed:', error);
@@ -137,6 +132,7 @@ function App() {
         setIsGeneratingVideo(false);
     }
 };
+
 
   return (
     <div className="app-container">
@@ -183,6 +179,16 @@ function App() {
             >
               {isGeneratingVideo ? 'Generating Video...' : 'Generate and Download Video'}
             </button>
+
+            {videoPreviewUrl && (
+                <div>
+                    <h2>Video Preview</h2>
+                    <video controls width="600">
+                        <source src={videoPreviewUrl} type="video/mp4" />
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            )}
           </div>
 
           {/* Two Column Layout */}

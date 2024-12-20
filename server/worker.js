@@ -10,24 +10,6 @@ if (!fs.existsSync(videosDir)) {
     fs.mkdirSync(videosDir);
 }
 
-// Clean up old videos (older than 1 hour)
-const cleanupOldVideos = () => {
-    const files = fs.readdirSync(videosDir);
-    const oneHourAgo = Date.now() - (60 * 60 * 1000);
-    
-    files.forEach(file => {
-        const filePath = path.join(videosDir, file);
-        const stats = fs.statSync(filePath);
-        if (stats.mtimeMs < oneHourAgo) {
-            fs.unlinkSync(filePath);
-            console.log(`Cleaned up old video: ${file}`);
-        }
-    });
-};
-
-// Run cleanup every hour
-setInterval(cleanupOldVideos, 60 * 60 * 1000);
-
 console.log('Video generation worker started');
 
 videoQueue.process(async (job) => {
@@ -55,9 +37,17 @@ videoQueue.process(async (job) => {
         );
         console.log('DeepInfra Response:', response.data);
 
-        const videoUrl = response.data.video_url;
-        console.log(`Job ${job.id} completed with video URL: ${videoUrl}`);
-        return { videoUrl };
+        // Assuming response.data.video_url is a base64 string
+        const base64Data = response.data.video_url.split(',')[1]; // Remove data URL prefix if present
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // Save the decoded video to a file
+        const fileName = `video_${job.id}.mp4`;
+        const filePath = path.join(videosDir, fileName);
+        fs.writeFileSync(filePath, buffer);
+        console.log(`Job ${job.id} completed with video saved as: ${fileName}`);
+
+        return { fileName };
     } catch (error) {
         console.error(`Job ${job.id} failed:`, error);
         throw error;
