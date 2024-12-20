@@ -11,6 +11,7 @@ function App() {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const API_BASE_URL = process.env.REACT_APP_API_URL;
+  const [videoFileName, setVideoFileName] = useState('');
   const [videoPreviewUrl, setVideoPreviewUrl] = useState('');
 
 
