@@ -20,7 +20,6 @@ const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
 
-app.use('/videos', express.static(path.join(__dirname, 'videos')));
 
 const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:5001'];
 
@@ -35,6 +34,13 @@ app.use(cors({
     methods: 'GET,POST,OPTIONS',
     allowedHeaders: 'Content-Type,Authorization'
 }));
+
+const videosDir = path.join(__dirname, 'videos');
+if (!fs.existsSync(videosDir)) {
+    fs.mkdirSync(videosDir);
+    console.log(`Created videos directory at: ${videosDir}`);
+}
+app.use('/videos', express.static(path.join(__dirname, 'videos')));
 app.use(express.json());
 
 // Serve the React build from the client folder
@@ -177,26 +183,6 @@ app.get('/top-summary', async (req, res) => {
     }
 });
 
-app.get('/job-status/:id', async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        const job = await videoQueue.getJob(id);
-
-        if (!job) {
-            return res.status(404).json({ error: 'Job not found' });
-        }
-
-        const state = await job.getState();
-        const result = job.returnvalue;
-
-        res.json({ state, result });
-    } catch (error) {
-        console.error('Error fetching job status:', error.message);
-        res.status(500).json({ error: 'Failed to fetch job status' });
-    }
-});
-
 app.get('/api/queue-status', async (req, res) => {
     try {
         const counts = await videoQueue.getJobCounts();
@@ -298,12 +284,8 @@ app.post('/generate-video', async (req, res) => {
     }
 
     try {
-        // Add the job to the queue
         const job = await videoQueue.add({ prompt });
-
         console.log(`Job ${job.id} added to the queue.`);
-
-        // Respond immediately with job ID so the frontend can poll for status
         res.status(202).json({ jobId: job.id });
     } catch (error) {
         console.error('Error adding job to queue:', error);
@@ -311,7 +293,6 @@ app.post('/generate-video', async (req, res) => {
     }
 });
 
-// Add a new route to check job status
 app.get('/job-status/:id', async (req, res) => {
     const { id } = req.params;
 
@@ -323,7 +304,6 @@ app.get('/job-status/:id', async (req, res) => {
         }
 
         if (job.finishedOn) {
-            const videoFilePath = path.join(__dirname, 'videos', job.returnvalue.fileName);
             return res.status(200).json({ state: 'completed', videoUrl: `/videos/${job.returnvalue.fileName}` });
         } else if (job.failedReason) {
             return res.status(500).json({ state: 'failed', error: job.failedReason });
@@ -535,3 +515,4 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 
+module.exports = { app, videosDir };

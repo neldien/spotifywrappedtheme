@@ -100,34 +100,40 @@ function App() {
         });
 
         const { optimizedPrompt } = promptData;
+// Request video generation and get the job ID
+const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`, {
+  prompt: optimizedPrompt,
+});
 
-        // Request video generation and download the video
-        const response = await axios.post(`${API_BASE_URL}/generate-video`, {
-            prompt: optimizedPrompt
-        });
+const jobId = jobData.jobId;
+console.log(`Job ${jobId} submitted. Polling for status...`);
 
-            // Assuming response.data contains the base64 string
-            const base64String = response.data.video_url.split(',')[1]; // Remove 'data:;base64,' prefix
+// Poll for job completion every 15 seconds
+const pollInterval = 15000; // 15 seconds
+const pollJobStatus = async () => {
+  const { data: status } = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
+  console.log(`Job ${jobId} status:`, status.state);
 
-            // Decode base64 to binary
-            const byteCharacters = atob(base64String);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
+  if (status.state === 'completed' && status.videoUrl) {
+      console.log('Video generation completed. Fetching video...');
+      setVideoPreviewUrl(status.videoUrl); // Show preview in UI
+      return; // Stop polling
+  }
 
-            // Create a Blob from the binary data
-            const videoBlob = new Blob([byteArray], { type: 'video/mp4' });
-            const videoUrl = URL.createObjectURL(videoBlob);
-        setVideoPreviewUrl(videoUrl);
+  if (status.state === 'failed') {
+      throw new Error('Video generation failed');
+  }
 
-    } catch (error) {
-        console.error('Video generation failed:', error);
-        alert('Failed to generate video: ' + error.message);
-    } finally {
-        setIsGeneratingVideo(false);
-    }
+  setTimeout(pollJobStatus, pollInterval);
+};
+
+await pollJobStatus();
+} catch (error) {
+console.error('Video generation failed:', error);
+alert('Failed to generate video: ' + error.message);
+} finally {
+setIsGeneratingVideo(false);
+}
 };
 
 
