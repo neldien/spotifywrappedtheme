@@ -36,9 +36,11 @@ app.use(cors({
 }));
 
 const videosDir = path.join(__dirname, 'videos');
-if (!fs.existsSync(videosDir)) {
-    fs.mkdirSync(videosDir);
-    console.log(`Server created videos directory at: ${videosDir}`);
+if (process.env.WORKER_ROLE !== 'true') {
+    if (!fs.existsSync(videosDir)) {
+        fs.mkdirSync(videosDir);
+        console.log(`Server created videos directory at: ${videosDir}`);
+    }
 }
 app.use('/videos', express.static(path.join(__dirname, 'videos')));
 app.use(express.json());
