@@ -4,10 +4,11 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-// Create videos directory if it doesn't exist
+// Create a directory for storing videos if it doesn't exist
 const videosDir = path.join(__dirname, 'videos');
 if (!fs.existsSync(videosDir)) {
     fs.mkdirSync(videosDir);
+    console.log(`Created videos directory at: ${videosDir}`);
 }
 
 console.log('Video generation worker started');
@@ -35,21 +36,30 @@ videoQueue.process(async (job) => {
                 },
             }
         );
+
         console.log('DeepInfra Response:', response.data);
 
-        // Assuming response.data.video_url is a base64 string
-        const base64Data = response.data.video_url.split(',')[1]; // Remove data URL prefix if present
+        // Extract and decode the Base64 video data
+        const base64Data = response.data.video_url.split(',')[1]; // Remove the data URL prefix, if present
+        if (!base64Data) {
+            throw new Error('Invalid Base64 data received from DeepInfra API');
+        }
+
         const buffer = Buffer.from(base64Data, 'base64');
 
         // Save the decoded video to a file
         const fileName = `video_${job.id}.mp4`;
         const filePath = path.join(videosDir, fileName);
-        fs.writeFileSync(filePath, buffer);
-        console.log(`Job ${job.id} completed with video saved as: ${fileName}`);
 
+        // Write the buffer to a file
+        fs.writeFileSync(filePath, buffer);
+
+        console.log(`Job ${job.id} completed successfully. Video saved at: ${filePath}`);
+
+        // Return the file name as the job result
         return { fileName };
     } catch (error) {
-        console.error(`Job ${job.id} failed:`, error);
-        throw error;
+        console.error(`Job ${job.id} failed:`, error.message || error);
+        throw new Error(`Job ${job.id} failed: ${error.message || 'Unknown error'}`);
     }
 });

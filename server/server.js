@@ -19,8 +19,8 @@ const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
-const videosDir = path.join(__dirname, 'videos');
-app.use('/videos', express.static(videosDir));
+
+app.use('/videos', express.static(path.join(__dirname, 'videos')));
 
 const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:5001'];
 
@@ -298,22 +298,40 @@ app.post('/generate-video', async (req, res) => {
     }
 
     try {
-        // Add job to the queue and wait for completion
+        // Add the job to the queue
         const job = await videoQueue.add({ prompt });
 
-        // Wait for the job to complete
-        const completedJob = await new Promise((resolve, reject) => {
-            job.on('completed', resolve);
-            job.on('failed', reject);
-        });
+        console.log(`Job ${job.id} added to the queue.`);
 
-        // Assuming the job returns the file path of the video
-        const videoFilePath = path.join(__dirname, 'videos', completedJob.returnvalue.fileName);
-
-        // Send the video file as a response
-        res.sendFile(videoFilePath);
+        // Respond immediately with job ID so the frontend can poll for status
+        res.status(202).json({ jobId: job.id });
     } catch (error) {
-        console.error('Error generating video:', error);
+        console.error('Error adding job to queue:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add a new route to check job status
+app.get('/job-status/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const job = await videoQueue.getJob(id);
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        if (job.finishedOn) {
+            const videoFilePath = path.join(__dirname, 'videos', job.returnvalue.fileName);
+            return res.status(200).json({ state: 'completed', videoUrl: `/videos/${job.returnvalue.fileName}` });
+        } else if (job.failedReason) {
+            return res.status(500).json({ state: 'failed', error: job.failedReason });
+        } else {
+            return res.status(200).json({ state: 'processing' });
+        }
+    } catch (error) {
+        console.error('Error fetching job status:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -420,34 +438,6 @@ app.get('/api/queue-status', async (req, res) => {
     }
 });
 
-// Check job status
-
-app.get('/job-status/:jobId', async (req, res) => {
-    try {
-        const job = await videoQueue.getJob(req.params.jobId);
-        if (!job) {
-            return res.status(404).json({ error: 'Job not found' });
-        }
-
-        const state = await job.getState();
-        const result = job.returnvalue;
-
-        if (state === 'completed' && result?.videoUrl) {
-            res.json({
-                state,
-                videoUrl: result.videoUrl
-            });
-        } else {
-            res.json({
-                state,
-                message: 'Video is still being processed'
-            });
-        }
-    } catch (error) {
-        console.error('Status check error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 app.get('/videos/:fileName', (req, res) => {
     const filePath = path.join(__dirname, 'videos', req.params.fileName);
