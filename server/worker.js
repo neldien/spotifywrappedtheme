@@ -3,13 +3,9 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+const { videosDir } = require('./server');
 
 // Create a directory for storing videos if it doesn't exist
-const videosDir = path.join(__dirname, 'videos');
-if (!fs.existsSync(videosDir)) {
-    fs.mkdirSync(videosDir);
-    console.log(`Created videos directory at: ${videosDir}`);
-}
 
 console.log('Video generation worker started');
 
