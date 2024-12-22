@@ -6,7 +6,12 @@ require('dotenv').config();
 const { videosDir } = require('./server');
 
 // Create a directory for storing videos if it doesn't exist
-
+if (process.env.WORKER_ROLE !== 'true') {
+    if (!fs.existsSync(videosDir)) {
+        fs.mkdirSync(videosDir);
+        console.log(`Server created videos directory at: ${videosDir}`);
+    }
+}
 console.log('Video generation worker started');
 
 videoQueue.process(async (job) => {
