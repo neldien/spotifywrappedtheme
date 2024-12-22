@@ -104,22 +104,24 @@ function App() {
         // Request video generation and download the video
         const response = await axios.post(`${API_BASE_URL}/generate-video`, {
             prompt: optimizedPrompt
-        }, { responseType: 'blob' });
+        });
 
-        // Create a URL for the video blob
-        const videoBlob = new Blob([response.data], { type: 'video/mp4' });
-        const videoUrl = URL.createObjectURL(videoBlob);
+            // Assuming response.data contains the base64 string
+            const base64String = response.data.videoBase64; // Adjust this based on your actual response structure
 
-        // Trigger download
-        const link = document.createElement('a');
-        link.href = videoUrl;
-        link.download = 'generated_video.mp4';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            // Decode base64 to binary
+            const byteCharacters = atob(base64String);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
 
-        // Revoke the object URL after download
-        URL.revokeObjectURL(videoUrl);
+            // Create a Blob from the binary data
+            const videoBlob = new Blob([byteArray], { type: 'video/mp4' });
+            const videoUrl = URL.createObjectURL(videoBlob);
+        setVideoPreviewUrl(videoUrl);
+
     } catch (error) {
         console.error('Video generation failed:', error);
         alert('Failed to generate video: ' + error.message);
