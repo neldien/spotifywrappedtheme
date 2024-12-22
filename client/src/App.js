@@ -107,7 +107,7 @@ function App() {
         });
 
             // Assuming response.data contains the base64 string
-            const base64String = response.data.videoBase64; // Adjust this based on your actual response structure
+            const base64String = response.data.video_url.split(',')[1]; // Remove 'data:;base64,' prefix
 
             // Decode base64 to binary
             const byteCharacters = atob(base64String);
