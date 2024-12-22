@@ -36,12 +36,7 @@ app.use(cors({
 }));
 
 const videosDir = path.join(__dirname, 'videos');
-if (process.env.WORKER_ROLE !== 'true') {
-    if (!fs.existsSync(videosDir)) {
-        fs.mkdirSync(videosDir);
-        console.log(`Server created videos directory at: ${videosDir}`);
-    }
-}
+
 app.use('/videos', express.static(path.join(__dirname, 'videos')));
 app.use(express.json());
 
@@ -306,7 +301,7 @@ app.get('/job-status/:id', async (req, res) => {
         }
 
         if (job.finishedOn) {
-            return res.status(200).json({ state: 'completed', videoUrl: `/videos/${job.returnvalue.fileName}` });
+            return res.status(200).json({ state: 'completed', videoUrl: job.returnvalue.videoUrl });
         } else if (job.failedReason) {
             return res.status(500).json({ state: 'failed', error: job.failedReason });
         } else {

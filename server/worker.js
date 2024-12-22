@@ -3,15 +3,29 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
-const { videosDir } = require('./server');
+const AWS = require('aws-sdk');
 
-// Create a directory for storing videos if it doesn't exist
-if (process.env.WORKER_ROLE == 'true') {
-    if (!fs.existsSync(videosDir)) {
-        fs.mkdirSync(videosDir);
-        console.log(`Server created videos directory at: ${videosDir}`);
-    }
+
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION, // E.g., 'us-east-1'
+});
+const bucketName = process.env.AWS_S3_BUCKET_NAME;
+
+async function uploadToS3(base64Data, bucketName, key) {
+    const buffer = Buffer.from(base64Data, 'base64');
+    const params = {
+        Bucket: bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: 'video/mp4'
+    };
+
+    return s3.upload(params).promise();
 }
+
+
 console.log('Video generation worker started');
 
 videoQueue.process(async (job) => {
@@ -38,27 +52,14 @@ videoQueue.process(async (job) => {
             }
         );
 
-        console.log('DeepInfra Response:', response.data);
+        const base64Data = response.data.video_url.split(',')[1];
+        console.log(base64Data);
+        const s3Key = `videos/video_${job.id}.mp4`;
+        const uploadResult = await uploadToS3(base64Data, bucketName, s3Key);
 
-        // Extract and decode the Base64 video data
-        const base64Data = response.data.video_url.split(',')[1]; // Remove the data URL prefix, if present
-        if (!base64Data) {
-            throw new Error('Invalid Base64 data received from DeepInfra API');
-        }
+        console.log(`Video uploaded to S3: ${uploadResult.Location}`);
 
-        const buffer = Buffer.from(base64Data, 'base64');
-
-        // Save the decoded video to a file
-        const fileName = `video_${job.id}.mp4`;
-        const filePath = path.join(videosDir, fileName);
-
-        // Write the buffer to a file
-        fs.writeFileSync(filePath, buffer);
-
-        console.log(`Job ${job.id} completed successfully. Video saved at: ${filePath}`);
-
-        // Return the file name as the job result
-        return { fileName };
+        return { videoUrl: uploadResult.Location };
     } catch (error) {
         console.error(`Job ${job.id} failed:`, error.message || error);
         throw new Error(`Job ${job.id} failed: ${error.message || 'Unknown error'}`);

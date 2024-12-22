@@ -100,40 +100,54 @@ function App() {
         });
 
         const { optimizedPrompt } = promptData;
-// Request video generation and get the job ID
-const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`, {
-  prompt: optimizedPrompt,
-});
 
-const jobId = jobData.jobId;
-console.log(`Job ${jobId} submitted. Polling for status...`);
+        // Request video generation and get the job ID
+        const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`, {
+            prompt: optimizedPrompt,
+        });
 
-// Poll for job completion every 15 seconds
-const pollInterval = 15000; // 15 seconds
-const pollJobStatus = async () => {
-  const { data: status } = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
-  console.log(`Job ${jobId} status:`, status.state);
+        const jobId = jobData.jobId;
+        console.log(`Job ${jobId} submitted. Polling for status...`);
 
-  if (status.state === 'completed' && status.videoUrl) {
-      console.log('Video generation completed. Fetching video...');
-      setVideoPreviewUrl(status.videoUrl); // Show preview in UI
-      return; // Stop polling
-  }
+        // Poll for job completion
+        const pollJobStatus = async () => {
+            try {
+                const { data } = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
 
-  if (status.state === 'failed') {
-      throw new Error('Video generation failed');
-  }
+                if (data.state === 'completed') {
+                    console.log('Video generation completed. Video URL:', data.videoUrl);
 
-  setTimeout(pollJobStatus, pollInterval);
-};
+                    // Set the video preview URL for display
+                    setVideoPreviewUrl(data.videoUrl);
 
-await pollJobStatus();
-} catch (error) {
-console.error('Video generation failed:', error);
-alert('Failed to generate video: ' + error.message);
-} finally {
-setIsGeneratingVideo(false);
-}
+                    // Optionally, download the video in the background
+                    const link = document.createElement('a');
+                    link.href = data.videoUrl;
+                    link.download = `video_${jobId}.mp4`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    setIsGeneratingVideo(false);
+                } else if (data.state === 'failed') {
+                    alert('Video generation failed: ' + data.error);
+                    setIsGeneratingVideo(false);
+                } else {
+                    console.log('Job still processing...');
+                    setTimeout(pollJobStatus, 15000); // Poll every 15 seconds
+                }
+            } catch (error) {
+                console.error('Error polling job status:', error.message);
+                setIsGeneratingVideo(false);
+            }
+        };
+
+        pollJobStatus();
+    } catch (error) {
+        console.error('Video generation failed:', error);
+        alert('Failed to generate video: ' + error.message);
+        setIsGeneratingVideo(false);
+    }
 };
 
 
