@@ -11,6 +11,13 @@ const upload = multer({ dest: 'uploads/' });
 const app = express();
 const session = require('express-session');
 const querystring = require('querystring'); // Import the querystring module
+const RedisStore = require('connect-redis')(session);
+const redis = require('redis');
+
+const redisClient = redis.createClient({
+    url: process.env.REDIS_URL, // Provided by Heroku Redis
+});
+
 
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -47,13 +54,14 @@ app.get('/api', (req, res) => {
 
 
 app.use(session({
+    store: new RedisStore({ client: redisClient }),
     secret: process.env.SESSION_SECRET, // Replace with a strong secret
     resave: false, // Avoid resaving session if it hasn’t been modified
     saveUninitialized: false, // Do not save uninitialized sessions
     cookie: {
         secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
         httpOnly: true, // Prevent access to cookies via JavaScript
-        maxAge: 1000 * 60 * 60 * 24 // 1 day in milliseconds
+        maxAge: 1000 * 60 * 60 // 1 hour in milliseconds
     }
 }));
 app.get('/', (req, res) => {
