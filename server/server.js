@@ -7,19 +7,14 @@ const { OpenAI } = require("openai");
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
-const upload = multer({ dest: 'uploads/' }); // Save uploads temporarily to 'uploads' folder
+const upload = multer({ dest: 'uploads/' });
 const app = express();
 
-// ChatGPT API Setup
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 const PORT = process.env.PORT || 5001;
-
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
-const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
-
 
 const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:5001'];
 
@@ -48,125 +43,122 @@ app.get('/api', (req, res) => {
     res.json({ message: "API is running!" });
 });
 
-// Serve React frontend for all other routes
-
-
 app.get('/', (req, res) => {
     res.send('Server is running!');
 });
 
-// Step 1: Redirect user to Spotify login
+// Redirect to Spotify's authorization page
 app.get('/login', (req, res) => {
-    const scope = 'user-top-read playlist-read-private playlist-read-collaborative';
-    const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${scope}&redirect_uri=${process.env.SPOTIFY_REDIRECT_URI}&show_dialog=false`;
-    res.redirect(authURL);
+    const scope = 'user-read-email user-read-private';
+    const authUrl = `https://accounts.spotify.com/authorize?${querystring.stringify({
+        response_type: 'code',
+        client_id: CLIENT_ID,
+        scope: scope,
+        redirect_uri: REDIRECT_URI,
+    })}`;
+    res.redirect(authUrl);
 });
 
-// Step 2: Handle the callback from Spotify
+// Handle the callback from Spotify
 app.get('/callback', async (req, res) => {
-    const code = req.query.code;
+    const code = req.query.code || null;
 
     try {
-        const response = await axios.post(
-            'https://accounts.spotify.com/api/token',
-            new URLSearchParams({
-                grant_type: 'authorization_code',
-                code: code,
-                redirect_uri: REDIRECT_URI,
-                client_id: CLIENT_ID,
-                client_secret: CLIENT_SECRET,
-            }).toString(),
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
+        const response = await axios.post('https://accounts.spotify.com/api/token', querystring.stringify({
+            code: code,
+            redirect_uri: REDIRECT_URI,
+            grant_type: 'authorization_code'
+        }), {
+            headers: {
+                'Authorization': 'Basic ' + Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64'),
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
-        );
+        });
 
-        const { access_token, refresh_token } = response.data;
+        const accessToken = response.data.access_token;
+        req.session.accessToken = accessToken;
 
-        // Redirect to frontend with tokens as query parameters
-        res.redirect(`${process.env.CLIENT_URL}?access_token=${access_token}&refresh_token=${refresh_token}`);
+        // Fetch user profile
+        const userProfile = await axios.get('https://api.spotify.com/v1/me', {
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+
+        req.session.user = {
+            name: userProfile.data.display_name,
+            email: userProfile.data.email
+        };
+
+        res.redirect('/');
     } catch (error) {
-        console.error('Error exchanging code for tokens:', error.message);
-        res.status(500).send('Authentication failed');
+        console.error('Error during authentication:', error.message);
+        res.redirect('/error');
+    }
+});
+// Endpoint to get user information
+app.get('/user-info', (req, res) => {
+    if (req.session.user) {
+        res.json({
+            name: req.session.user.name,
+            email: req.session.user.email
+        });
+    } else {
+        res.status(401).json({ error: 'User not authenticated' });
     }
 });
 
 // Step 3: Use access token to fetch Spotify data
-app.get('/top-tracks', async (req, res) => {
-    const { access_token, time_range = 'long_term' } = req.query; // Default to long_term if time_range is missing
-    console.log('Received time_range from frontend:', time_range); // Log the time_range received
+
+app.get('/top-tracks', isAuthenticated, async (req, res) => {
+    const { time_range = 'long_term' } = req.query; // Default to long_term
+    const accessToken = req.session.accessToken; // Retrieve token from session
 
     try {
         const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
             headers: {
-                Authorization: `Bearer ${access_token}`,
+                Authorization: `Bearer ${accessToken}`,
             },
-            params: { time_range, limit: 50 }, // Pass time_range to Spotify
+            params: { time_range, limit: 50 },
         });
 
-        console.log('Response from Spotify API:', response.data); // Log Spotify's response
-        res.json(response.data); // Send response back to frontend
+        res.json(response.data);
     } catch (error) {
-        console.error('Error from Spotify API:', error.response?.data || error.message); // Log Spotify errors
-        res.status(500).send('Failed to fetch top tracks');
+        console.error('Error fetching top tracks:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Failed to fetch top tracks' });
     }
 });
 
-// Fetch all playlists of the current user
-// Fetch all playlists, including paginated results
-app.get('/playlists', async (req, res) => {
-    const { access_token } = req.query; // Access token from query parameters
-    try {
-        const response = await axios.get('https://api.spotify.com/v1/me/playlists', {
-            headers: {
-                Authorization: `Bearer ${access_token}`,
-            },
-        });
-
-        res.json(response.data); // Send the playlists to the frontend
-    } catch (error) {
-        console.error('Error fetching playlists:', error.response?.data || error.message);
-        res.status(500).send('Failed to fetch playlists');
-    }
-});
-
-app.get('/top-artists', async (req, res) => {
-    const { access_token, time_range = 'long_term' } = req.query; // Default to long_term
+app.get('/top-artists', isAuthenticated, async (req, res) => {
+    const { time_range = 'long_term' } = req.query; // Default to long_term
+    const accessToken = req.session.accessToken; // Retrieve token from session
 
     try {
         const response = await axios.get('https://api.spotify.com/v1/me/top/artists', {
             headers: {
-                Authorization: `Bearer ${access_token}`,
+                Authorization: `Bearer ${accessToken}`,
             },
-            params: {
-                time_range,
-                limit: 50, // Max 50 items per request
-            },
+            params: { time_range, limit: 50 },
         });
 
-        res.json(response.data); // Return top artists
+        res.json(response.data);
     } catch (error) {
         console.error('Error fetching top artists:', error.response?.data || error.message);
-        res.status(500).send('Failed to fetch top artists');
+        res.status(500).json({ error: 'Failed to fetch top artists' });
     }
 });
 
-
-app.get('/top-summary', async (req, res) => {
-    const { access_token } = req.query;
+app.get('/top-summary', isAuthenticated, async (req, res) => {
+    const accessToken = req.session.accessToken; // Retrieve token from session
 
     try {
         // Fetch top tracks
         const tracksResponse = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
-            headers: { Authorization: `Bearer ${access_token}` },
+            headers: { Authorization: `Bearer ${accessToken}` },
             params: { time_range: 'long_term', limit: 30 },
         });
 
         // Fetch top artists
         const artistsResponse = await axios.get('https://api.spotify.com/v1/me/top/artists', {
-            headers: { Authorization: `Bearer ${access_token}` },
+            headers: { Authorization: `Bearer ${accessToken}` },
             params: { time_range: 'long_term', limit: 30 },
         });
 
@@ -176,7 +168,7 @@ app.get('/top-summary', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching top summary:', error.response?.data || error.message);
-        res.status(500).send('Failed to fetch top summary');
+        res.status(500).json({ error: 'Failed to fetch top summary' });
     }
 });
 

@@ -3,7 +3,7 @@ import axios from 'axios';
 import './App.css';
 
 function App() {
-  const [accessToken, setAccessToken] = useState('');
+  const [user, setUser] = useState(null);
   const [topSummary, setTopSummary] = useState(null);
   const [generatedSummary, setGeneratedSummary] = useState('');
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -14,47 +14,46 @@ function App() {
   const [videoPreviewUrl, setVideoPreviewUrl] = useState('');
 
 
-  // Extract access token from URL
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('access_token');
-    if (token) {
-      setAccessToken(token);
-      fetchTopSummary(token);
-    }
-  }, []);
+    const fetchUserInfo = async () => {
+        try {
+            const response = await axios.get('/user-info');
+            setUser(response.data);
+            fetchTopSummary();
+        } catch (error) {
+            console.error('Error fetching user info:', error.message);
+        }
+    };
 
-  // Fetch Top Summary
-  const fetchTopSummary = async (token) => {
-    try {
-      const { data } = await axios.get(`${API_BASE_URL}/top-summary`, {
-        params: { access_token: token },
-      });
+    fetchUserInfo();
+}, []);
+
+const fetchTopSummary = async () => {
+  try {
+      const { data } = await axios.get(`${API_BASE_URL}/top-summary`);
 
       const reducedPayload = {
-        topArtists: data.topArtists.map((artist) => ({
-          id: artist.id,
-          name: artist.name,
-          genres: artist.genres,
-        })),
-        topTracks: data.topTracks.map((track) => ({
-          id: track.id,
-          name: track.name,
-          artist: track.artists[0]?.name || 'Unknown Artist',
-        })),
+          topArtists: data.topArtists.map((artist) => ({
+              id: artist.id,
+              name: artist.name,
+              genres: artist.genres,
+          })),
+          topTracks: data.topTracks.map((track) => ({
+              id: track.id,
+              name: track.name,
+              artist: track.artists[0]?.name || 'Unknown Artist',
+          })),
       };
 
       setTopSummary(reducedPayload);
       generateSummary(reducedPayload);
-    } catch (error) {
+  } catch (error) {
       console.error('Error fetching top summary:', error.message);
-    }
-  };
-
+  }
+};
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     setUploadedImage(file);
-
-    // Generate preview URL for the image
     setPreviewUrl(URL.createObjectURL(file));
 
     const formData = new FormData();
@@ -156,7 +155,7 @@ function App() {
       <h1>Spotify Music Taste Summary</h1>
 
       {/* Login Button */}
-      {!accessToken ? (
+      {!user ? (
         <a href={`${process.env.REACT_APP_API_URL}/login`}>
           <button className="login-button">Login with Spotify</button>
         </a>
@@ -164,8 +163,8 @@ function App() {
         <div>
           {/* Music Summary */}
           <section className="music-summary-section">
-            <h2>Your Top Music Summary</h2>
-            <p className="generated-summary">
+          <h2>{user.name}'s Top Music Summary</h2>
+          <p className="generated-summary">
               {generatedSummary || 'Generating your music summary...'}
             </p>
           </section>
