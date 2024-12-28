@@ -11,7 +11,7 @@ const upload = multer({ dest: 'uploads/' });
 const app = express();
 const session = require('express-session');
 const querystring = require('querystring'); // Import the querystring module
-const RedisStore = require('connect-redis')(session);
+const RedisStore = require('connect-redis').default; // Use `.default` for modern versions
 const redis = require('redis');
 
 const redisClient = redis.createClient({
