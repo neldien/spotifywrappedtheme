@@ -27,6 +27,7 @@ function App() {
   };
 
     fetchUserInfo();
+    fetchTopSummary();
 }, []);
 
 const fetchTopSummary = async () => {
