@@ -1,4 +1,4 @@
-import 'dotenv/config';
+require('dotenv').config();
 const express = require('express');
 const videoQueue = require('./queue');
 const axios = require('axios');
@@ -48,7 +48,7 @@ app.get('/api', (req, res) => {
 
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key', // Replace with a strong secret
+    secret: process.env.SESSION_SECRET, // Replace with a strong secret
     resave: false, // Avoid resaving session if it hasn’t been modified
     saveUninitialized: false, // Do not save uninitialized sessions
     cookie: {
