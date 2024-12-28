@@ -11,13 +11,6 @@ const upload = multer({ dest: 'uploads/' });
 const app = express();
 const session = require('express-session');
 const querystring = require('querystring'); // Import the querystring module
-const RedisStore = require('connect-redis').default; // Use `.default` for modern versions
-const redis = require('redis');
-
-const redisClient = redis.createClient({
-    url: process.env.REDIS_URL, // Provided by Heroku Redis
-});
-
 
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -54,14 +47,13 @@ app.get('/api', (req, res) => {
 
 
 app.use(session({
-    store: new RedisStore({ client: redisClient }),
     secret: process.env.SESSION_SECRET, // Replace with a strong secret
     resave: false, // Avoid resaving session if it hasn’t been modified
     saveUninitialized: false, // Do not save uninitialized sessions
     cookie: {
         secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
         httpOnly: true, // Prevent access to cookies via JavaScript
-        maxAge: 1000 * 60 * 60 // 1 hour in milliseconds
+        maxAge: 1000 * 60 * 60 * 24 // 1 day in milliseconds
     }
 }));
 app.get('/', (req, res) => {
@@ -83,15 +75,8 @@ app.get('/login', (req, res) => {
 // Handle the callback from Spotify
 app.get('/callback', async (req, res) => {
     const code = req.query.code || null;
-    if (!code) {
-        console.error('No authorization code received.');
-        return res.redirect('/error');
-    }
-
     try {
-        console.log('Authorization code received:', code);
-
-        const tokenResponse = await axios.post('https://accounts.spotify.com/api/token', querystring.stringify({
+        const response = await axios.post('https://accounts.spotify.com/api/token', querystring.stringify({
             code: code,
             redirect_uri: REDIRECT_URI,
             grant_type: 'authorization_code'
@@ -102,20 +87,13 @@ app.get('/callback', async (req, res) => {
             }
         });
 
-        const accessToken = tokenResponse.data.access_token;
-        const refreshToken = tokenResponse.data.refresh_token;
-
-        console.log('Access Token:', accessToken);
-        console.log('Refresh Token:', refreshToken);
-
+        const accessToken = response.data.access_token;
         req.session.accessToken = accessToken;
 
         // Fetch user profile
         const userProfile = await axios.get('https://api.spotify.com/v1/me', {
             headers: { 'Authorization': 'Bearer ' + accessToken }
         });
-
-        console.log('User Profile:', userProfile.data);
 
         req.session.user = {
             name: userProfile.data.display_name,
@@ -124,7 +102,7 @@ app.get('/callback', async (req, res) => {
 
         res.redirect('/');
     } catch (error) {
-        console.error('Error during authentication:', error.response?.data || error.message);
+        console.error('Error during authentication:', error.message);
         res.redirect('/error');
     }
 });
@@ -137,14 +115,31 @@ function isAuthenticated(req, res, next) {
 }
 
 // Endpoint to get user information
-app.get('/user-info', (req, res) => {
-    if (req.session.user) {
-        res.json({
-            name: req.session.user.name,
-            email: req.session.user.email
+app.get('/user-info', async (req, res) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+        return res.status(401).json({ error: 'Authorization header is missing' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ error: 'Access token is missing' });
+    }
+
+    try {
+        // Fetch user profile from Spotify to verify the token
+        const response = await axios.get('https://api.spotify.com/v1/me', {
+            headers: { Authorization: `Bearer ${token}` },
         });
-    } else {
-        res.status(401).json({ error: 'User not authenticated' });
+
+        res.json({
+            name: response.data.display_name,
+            email: response.data.email,
+        });
+    } catch (error) {
+        console.error('Error validating token:', error.response?.data || error.message);
+        res.status(401).json({ error: 'Invalid or expired token' });
     }
 });
 
