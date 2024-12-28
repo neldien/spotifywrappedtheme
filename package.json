@@ -7,6 +7,7 @@
     "axios": "^1.7.9",
     "body-parser": "^1.20.3",
     "bull": "^4.16.5",
+    "connect-redis": "^8.0.1",
     "cors": "^2.8.5",
     "cra-template": "1.2.0",
     "deepinfra": "^2.0.2",
