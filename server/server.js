@@ -37,7 +37,6 @@ const videosDir = path.join(__dirname, 'videos');
 
 app.use('/videos', express.static(path.join(__dirname, 'videos')));
 app.use(express.json());
-
 // Serve the React build from the client folder
 app.use(express.static(path.join(__dirname, '../client/build')));
 
@@ -76,9 +75,15 @@ app.get('/login', (req, res) => {
 // Handle the callback from Spotify
 app.get('/callback', async (req, res) => {
     const code = req.query.code || null;
+    if (!code) {
+        console.error('No authorization code received.');
+        return res.redirect('/error');
+    }
 
     try {
-        const response = await axios.post('https://accounts.spotify.com/api/token', querystring.stringify({
+        console.log('Authorization code received:', code);
+
+        const tokenResponse = await axios.post('https://accounts.spotify.com/api/token', querystring.stringify({
             code: code,
             redirect_uri: REDIRECT_URI,
             grant_type: 'authorization_code'
@@ -89,13 +94,20 @@ app.get('/callback', async (req, res) => {
             }
         });
 
-        const accessToken = response.data.access_token;
+        const accessToken = tokenResponse.data.access_token;
+        const refreshToken = tokenResponse.data.refresh_token;
+
+        console.log('Access Token:', accessToken);
+        console.log('Refresh Token:', refreshToken);
+
         req.session.accessToken = accessToken;
 
         // Fetch user profile
         const userProfile = await axios.get('https://api.spotify.com/v1/me', {
             headers: { 'Authorization': 'Bearer ' + accessToken }
         });
+
+        console.log('User Profile:', userProfile.data);
 
         req.session.user = {
             name: userProfile.data.display_name,
@@ -104,7 +116,7 @@ app.get('/callback', async (req, res) => {
 
         res.redirect('/');
     } catch (error) {
-        console.error('Error during authentication:', error.message);
+        console.error('Error during authentication:', error.response?.data || error.message);
         res.redirect('/error');
     }
 });
