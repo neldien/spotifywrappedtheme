@@ -88,8 +88,7 @@ app.get('/callback', async (req, res) => {
         });
 
         const accessToken = response.data.access_token;
-        req.session.accessToken = accessToken;
-
+        localStorage.setItem('spotifyAccessToken', accessToken);
         // Fetch user profile
         const userProfile = await axios.get('https://api.spotify.com/v1/me', {
             headers: { 'Authorization': 'Bearer ' + accessToken }
