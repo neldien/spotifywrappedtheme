@@ -20,6 +20,7 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.2",
     "react-scripts": "^3.0.1",
+    "redis": "^4.7.0",
     "redis-server": "^1.2.2"
   },
   "scripts": {
