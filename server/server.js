@@ -9,6 +9,7 @@ const multer = require('multer');
 const fs = require('fs');
 const upload = multer({ dest: 'uploads/' });
 const app = express();
+const session = require('express-session');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const PORT = process.env.PORT || 5001;
@@ -43,6 +44,17 @@ app.get('/api', (req, res) => {
     res.json({ message: "API is running!" });
 });
 
+
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key', // Replace with a strong secret
+    resave: false, // Avoid resaving session if it hasn’t been modified
+    saveUninitialized: false, // Do not save uninitialized sessions
+    cookie: {
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+        httpOnly: true, // Prevent access to cookies via JavaScript
+        maxAge: 1000 * 60 * 60 * 24 // 1 day in milliseconds
+    }
+}));
 app.get('/', (req, res) => {
     res.send('Server is running!');
 });
@@ -94,6 +106,14 @@ app.get('/callback', async (req, res) => {
         res.redirect('/error');
     }
 });
+
+function isAuthenticated(req, res, next) {
+    if (req.session.accessToken) {
+        return next();
+    }
+    res.status(401).json({ error: 'User not authenticated' });
+}
+
 // Endpoint to get user information
 app.get('/user-info', (req, res) => {
     if (req.session.user) {
@@ -105,8 +125,6 @@ app.get('/user-info', (req, res) => {
         res.status(401).json({ error: 'User not authenticated' });
     }
 });
-
-// Step 3: Use access token to fetch Spotify data
 
 app.get('/top-tracks', isAuthenticated, async (req, res) => {
     const { time_range = 'long_term' } = req.query; // Default to long_term
