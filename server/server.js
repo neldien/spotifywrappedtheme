@@ -128,7 +128,7 @@ app.get('/user-info', async (req, res) => {
     }
 
     try {
-        // Fetch user profile from Spotify to verify the token
+        // Validate token with Spotify
         const response = await axios.get('https://api.spotify.com/v1/me', {
             headers: { Authorization: `Bearer ${token}` },
         });
@@ -138,8 +138,12 @@ app.get('/user-info', async (req, res) => {
             email: response.data.email,
         });
     } catch (error) {
-        console.error('Error validating token:', error.response?.data || error.message);
-        res.status(401).json({ error: 'Invalid or expired token' });
+        if (error.response?.status === 401) {
+            console.error('Token is invalid or expired:', error.response.data);
+            return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
+        }
+        console.error('Error validating token:', error.message);
+        res.status(500).json({ error: 'An unexpected error occurred' });
     }
 });
 

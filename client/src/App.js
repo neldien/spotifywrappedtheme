@@ -16,18 +16,14 @@ function App() {
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-      try {
-          const accessToken = localStorage.getItem('spotifyAccessToken'); // Ensure you save the token on login
-          const response = await axios.get('/user-info', {
-              headers: {
-                  Authorization: `Bearer ${accessToken}`,
-              },
-          });
-          setUser(response.data);
-          fetchTopSummary();
-      } catch (error) {
-          console.error('Error fetching user info:', error.message);
+      const token = localStorage.getItem('spotifyAccessToken'); // Ensure this is set correctly
+      if (!token) {
+          throw new Error('Access token not found');
       }
+      const response = await axios.get('/user-info', {
+          headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
   };
 
     fetchUserInfo();
