@@ -1,4 +1,4 @@
-require('dotenv').config();
+import 'dotenv/config';
 const express = require('express');
 const videoQueue = require('./queue');
 const axios = require('axios');
@@ -10,6 +10,8 @@ const fs = require('fs');
 const upload = multer({ dest: 'uploads/' });
 const app = express();
 const session = require('express-session');
+const querystring = require('querystring'); // Import the querystring module
+
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const PORT = process.env.PORT || 5001;
