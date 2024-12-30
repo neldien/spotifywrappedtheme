@@ -19,7 +19,7 @@ const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 
-const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:5001'];
+const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:5001', 'http://localhost:3000'];
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -30,24 +30,11 @@ app.use(cors({
         }
     },
     methods: 'GET,POST,OPTIONS',
-    allowedHeaders: 'Content-Type,Authorization'
+    allowedHeaders: 'Content-Type,Authorization,Origin',
+    credentials: true,
 }));
-
-const videosDir = path.join(__dirname, 'videos');
-
-app.use('/videos', express.static(path.join(__dirname, 'videos')));
-app.use(express.json());
-// Serve the React build from the client folder
-app.use(express.static(path.join(__dirname, '../client/build')));
-
-// API routes
-app.get('/api', (req, res) => {
-    res.json({ message: "API is running!" });
-});
-
-
 app.use(session({
-    secret: process.env.SESSION_SECRET, // Replace with a strong secret
+    secret: process.env.SESSION_SECRET, 
     resave: false, // Avoid resaving session if it hasn’t been modified
     saveUninitialized: false, // Do not save uninitialized sessions
     cookie: {
@@ -56,13 +43,26 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24 // 1 day in milliseconds
     }
 }));
+const videosDir = path.join(__dirname, 'videos');
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '../client/build')));
+app.use('/videos', express.static(path.join(__dirname, 'videos')));
+
+// API routes
+app.get('/api', (req, res) => {
+    res.json({ message: "API is running!" });
+});
+
+
+
 app.get('/', (req, res) => {
     res.send('Server is running!');
 });
 
 // Redirect to Spotify's authorization page
 app.get('/login', (req, res) => {
-    const scope = 'user-read-email user-read-private';
+    const scope = 'user-read-email user-read-private user-top-read'; // 
     const authUrl = `https://accounts.spotify.com/authorize?${querystring.stringify({
         response_type: 'code',
         client_id: CLIENT_ID,
@@ -72,37 +72,43 @@ app.get('/login', (req, res) => {
     res.redirect(authUrl);
 });
 
-// Handle the callback from Spotify
 app.get('/callback', async (req, res) => {
-    const code = req.query.code || null;
+    const code = req.query.code;
+
+    if (!code) {
+        console.error('No code provided in the callback request.');
+        return res.status(400).send('No code provided in the callback request.');
+    }
+
     try {
-        const response = await axios.post('https://accounts.spotify.com/api/token', querystring.stringify({
-            code: code,
-            redirect_uri: REDIRECT_URI,
-            grant_type: 'authorization_code'
-        }), {
-            headers: {
-                'Authorization': 'Basic ' + Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64'),
-                'Content-Type': 'application/x-www-form-urlencoded'
+        const response = await axios.post(
+            'https://accounts.spotify.com/api/token',
+            new URLSearchParams({
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: REDIRECT_URI,
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+            }).toString(),
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
             }
-        });
+        );
 
-        const accessToken = response.data.access_token;
-        localStorage.setItem('spotifyAccessToken', accessToken);
-        // Fetch user profile
-        const userProfile = await axios.get('https://api.spotify.com/v1/me', {
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        });
+        const { access_token } = response.data;
+        console.log('Access token received:', access_token);
 
-        req.session.user = {
-            name: userProfile.data.display_name,
-            email: userProfile.data.email
-        };
+        req.session.accessToken = access_token; // Store the token in the session
+        console.log('Access token stored in session:', req.session.accessToken);
 
-        res.redirect('/');
+        // Redirect to the frontend
+        res.redirect('http://localhost:3000');
     } catch (error) {
-        console.error('Error during authentication:', error.message);
-        res.redirect('/error');
+        // Log error details
+        console.error('Error during token exchange:', error.response?.data || error.message);
+        res.status(500).send('Authentication failed');
     }
 });
 
@@ -115,34 +121,23 @@ function isAuthenticated(req, res, next) {
 
 // Endpoint to get user information
 app.get('/user-info', async (req, res) => {
-    const authHeader = req.headers.authorization;
+    console.log('Session access token:', req.session.accessToken);
 
-    if (!authHeader) {
-        return res.status(401).json({ error: 'Authorization header is missing' });
-    }
+    const accessToken = req.session.accessToken;
 
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-        return res.status(401).json({ error: 'Access token is missing' });
+    if (!accessToken) {
+        return res.status(401).json({ error: 'User not authenticated' });
     }
 
     try {
-        // Validate token with Spotify
         const response = await axios.get('https://api.spotify.com/v1/me', {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${accessToken}` },
         });
 
-        res.json({
-            name: response.data.display_name,
-            email: response.data.email,
-        });
+        res.json(response.data);
     } catch (error) {
-        if (error.response?.status === 401) {
-            console.error('Token is invalid or expired:', error.response.data);
-            return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
-        }
-        console.error('Error validating token:', error.message);
-        res.status(500).json({ error: 'An unexpected error occurred' });
+        console.error('Error fetching user info:', error.message);
+        res.status(500).json({ error: 'Failed to fetch user info' });
     }
 });
 
@@ -384,7 +379,7 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
                 {
                     role: "user",
                     content: [
-                        { type: "text", text: "Describe this image in an accurate way, including physical features of the individual, so that it can be used in a video prompt. be concise, do it in less than 50 words" },
+                        { type: "text", text: "Describe this image in an accurate way, including physical features of the individual, so that it can be used in a video prompt. be concise, do it in less than 50 words. limit descriptions of the setting to an absolute minimum" },
                         {
                             type: "image_url",
                             image_url: {
