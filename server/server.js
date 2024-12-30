@@ -104,7 +104,7 @@ app.get('/callback', async (req, res) => {
         console.log('Access token stored in session:', req.session.accessToken);
 
         // Redirect to the frontend
-        res.redirect('http://localhost:3000');
+        res.redirect(process.env.CLIENT_URL);
     } catch (error) {
         // Log error details
         console.error('Error during token exchange:', error.response?.data || error.message);
