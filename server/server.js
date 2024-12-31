@@ -65,7 +65,6 @@ app.get('/', (req, res) => {
 // Redirect to Spotify's authorization page
 app.get('/login', (req, res) => {
     const scope = 'user-read-email user-read-private user-top-read'; 
-    const redirectUri = encodeURIComponent(REDIRECT_URI);
     const fallbackUrl = `https://accounts.spotify.com/authorize?${querystring.stringify({
         response_type: 'code',
         client_id: CLIENT_ID,
@@ -80,23 +79,15 @@ app.get('/login', (req, res) => {
         redirect_uri: REDIRECT_URI,
     })}`;
 
-    const androidSpotifyUrl = `intent://accounts.spotify.com/inapp-authorize?${querystring.stringify({
-        response_type: 'code',
-        client_id: CLIENT_ID,
-        scope: scope,
-        redirect_uri: REDIRECT_URI,
-    })}#Intent;scheme=https;package=com.spotify.music;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
-
-    // Detect platform
+    // Detect if the user is on iOS
     const userAgent = req.headers['user-agent'];
     const isIOS = /iphone|ipad|ipod/i.test(userAgent);
-    const isAndroid = /android/i.test(userAgent);
 
     if (isIOS) {
+        // Redirect to Spotify app on iOS
         res.redirect(iosSpotifyUrl);
-    } else if (isAndroid) {
-        res.redirect(androidSpotifyUrl);
     } else {
+        // Fallback to base flow
         res.redirect(fallbackUrl);
     }
 });
