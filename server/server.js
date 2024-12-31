@@ -331,11 +331,12 @@ app.post('/generate-summary', async (req, res) => {
         const trackNames = topTracks.map((track) => track.name).slice(0, 5).join(', ');
 
         const prompt = `
-            Summarize my music taste in a fun, creative, artistic and visual name way. 
+            Summarize my music taste in a fun, creative, artistic and visual name way. PAINT A BEAUTIFUL ACTIVE COHESIVE SCENE" 
+            Describe the energy, vibe, and themes of this music taste. be colorful and descriptive. 
+
             My favorite artists are: ${artistNames}. 
             My favorite tracks are: ${trackNames}. 
-            Describe the energy, vibe, and themes of this music taste. be colorful and descriptive. 
-            Keep it under 100 words!!!, only use a 2 of the artists and and 2 tracks names.
+    DO NOT use more than 2 ARTISTS NAMES. DO NOT USE MORE THAN 2 TRACK NAMES!!!
             i dont want to be overwhelmed. feel free to break it into paragraphs and make it easy to read.
             Keep it under 75 words!!!! and in theme with spotify wrapped.
         `;
