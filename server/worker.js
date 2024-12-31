@@ -33,8 +33,6 @@ async function uploadToS3(base64Data, bucketName, key) {
 
     return s3.upload(params).promise();
 }
-
-
 console.log('Video generation worker started');
 
 videoQueue.process(async (job) => {
