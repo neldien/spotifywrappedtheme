@@ -110,23 +110,25 @@ function App() {
     console.log('Starting video generation with music summary and image description.');
 
     try {
-        // Get the optimized prompt
+        // Step 1: Generate optimized prompt
         const { data: promptData } = await axios.post(`${API_BASE_URL}/generate-video-prompt`, {
             musicSummary: generatedSummary,
             imageDescription
         });
 
         const { optimizedPrompt } = promptData;
+        console.log('Optimized prompt generated:', optimizedPrompt);
 
-        // Request video generation and get the job ID
-        const { data: jobData } = await axios.post(`${API_BASE_URL}/generate-video`, {
+        // Step 2: Submit video generation job
+        const { data: jobData } = await axios.post(`${API_BASE_URL}/api/generate-video`, {
             prompt: optimizedPrompt,
+            email: user.email, // Assuming `user.email` is available from Spotify user info
         });
 
         const jobId = jobData.jobId;
         console.log(`Job ${jobId} submitted. Polling for status...`);
 
-        // Poll for job completion
+        // Step 3: Poll for job completion
         const pollJobStatus = async () => {
             try {
                 const { data } = await axios.get(`${API_BASE_URL}/job-status/${jobId}`);
@@ -134,16 +136,11 @@ function App() {
                 if (data.state === 'completed') {
                     console.log('Video generation completed. Video URL:', data.videoUrl);
 
-                    // Set the video preview URL for display
+                    // Update video preview URL for display
                     setVideoPreviewUrl(data.videoUrl);
 
-                    // Optionally, download the video in the background
-                    const link = document.createElement('a');
-                    link.href = data.videoUrl;
-                    link.download = `video_${jobId}.mp4`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                    // Inform the user the video is ready and emailed
+                    alert('Your video is ready and has been sent to your email!');
 
                     setIsGeneratingVideo(false);
                 } else if (data.state === 'failed') {
@@ -166,7 +163,6 @@ function App() {
         setIsGeneratingVideo(false);
     }
 };
-
 
   return (
     <div className="app-container">
