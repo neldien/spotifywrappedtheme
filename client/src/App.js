@@ -207,7 +207,7 @@ function App() {
               disabled={isGeneratingVideo}
               aria-label="Generate and download a personalized video based on your music taste"
             >
-              {isGeneratingVideo ? 'Generating Video...' : 'Generate and Download Video'}
+              {isGeneratingVideo ? 'Generating Video...' : 'Generate the video: Check your email!'}
             </button>
 
             {videoPreviewUrl && (
