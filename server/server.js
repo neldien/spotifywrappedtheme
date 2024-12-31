@@ -239,7 +239,7 @@ app.post('/generate-video-prompt', async (req, res) => {
         const videoPromptTemplate = `
         Transform the following input into a video creation prompt where the primary focus is on the subjects described in the image:
         
-        1. Subjects: "${imageDescription}". These individuals or elements must be the main focus of the scene. Center the visuals around their appearance, actions, and presence.
+        1. Subjects: "${imageDescription}". These individuals or elements are the main focus of the scene, but the scenery around them is still apparent. Place them into the 
         
         2. Scene Guidelines:
         - The scene should reflect the **energy, mood, and themes** suggested by the following summary: "${musicSummary}".
@@ -250,7 +250,7 @@ app.post('/generate-video-prompt', async (req, res) => {
         
         3. Length: Keep the description under 120 words, ensuring it is concise and focused.
         
-        **Goal**: Create a visually captivating and engaging scene where the subjects described in the image take center stage, inspired by the themes of the summary.
+        **Goal**: Create a visually captivating and engaging scene where the subjects described in the image take center stage, inspired by the themes of the summary. make sure the settings is really well described and action oritented!!!!!"
         `;
 
         const response = await openai.chat.completions.create({
@@ -299,23 +299,6 @@ app.post('/generate-music-prompt', async (req, res) => {
 });
 
 // Start video generation
-app.post('/generate-video', async (req, res) => {
-    const { prompt } = req.body;
-
-    if (!prompt) {
-        console.error("Invalid or missing 'prompt'");
-        return res.status(400).json({ error: "The 'prompt' field is required." });
-    }
-
-    try {
-        const job = await videoQueue.add({ prompt });
-        console.log(`Job ${job.id} added to the queue.`);
-        res.status(202).json({ jobId: job.id });
-    } catch (error) {
-        console.error('Error adding job to queue:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 app.get('/job-status/:id', async (req, res) => {
     const { id } = req.params;
@@ -348,18 +331,19 @@ app.post('/generate-summary', async (req, res) => {
         const trackNames = topTracks.map((track) => track.name).slice(0, 5).join(', ');
 
         const prompt = `
-            Summarize my music taste in a fun, creative way. 
+            Summarize my music taste in a fun, creative, artistic and visual name way. 
             My favorite artists are: ${artistNames}. 
             My favorite tracks are: ${trackNames}. 
             Describe the energy, vibe, and themes of this music taste. be colorful and descriptive. 
-            Keep it under 100 words, only use a few of the artists and tracks names.
-             i dont want to be overwhelmed. feel free to break it into paragraphs and what not.
+            Keep it under 100 words!!!, only use a 2 of the artists and and 2 tracks names.
+            i dont want to be overwhelmed. feel free to break it into paragraphs and make it easy to read.
+            Keep it under 75 words!!!! and in theme with spotify wrapped.
         `;
 
         const response = await openai.chat.completions.create({
             model: 'gpt-4o',
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 250,
+            max_tokens: 200,
         });
 
         const summary = response.choices[0].message.content;
@@ -509,6 +493,23 @@ app.get('/view-video/:jobId', async (req, res) => {
         res.status(500).send('Error loading video: ' + error.message);
     }
 });
+
+app.post('/api/generate-video', async (req, res) => {
+    const { prompt, email } = req.body;
+
+    if (!prompt || !email) {
+        return res.status(400).json({ error: 'Prompt and email are required' });
+    }
+
+    try {
+        const job = await videoQueue.add({ prompt, email });
+        res.json({ message: 'Your video is being processed! You will receive an email in a few minutes (we use the email tied to your Spotify account!).', jobId: job.id });
+    } catch (error) {
+        console.error('Error adding job to queue:', error.message);
+        res.status(500).json({ error: 'Failed to process your request.' });
+    }
+});
+
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
