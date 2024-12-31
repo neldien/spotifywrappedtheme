@@ -21,6 +21,7 @@ const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 
 const allowedOrigins = ['https://wrappedthemegpt.com', 'http://localhost:5001', 'http://localhost:3000'];
 
+app.set('trust proxy', 1);
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin || allowedOrigins.includes(origin)) {
@@ -38,8 +39,9 @@ app.use(session({
     resave: false, // Avoid resaving session if it hasn’t been modified
     saveUninitialized: false, // Do not save uninitialized sessions
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+        secure: process.env.NODE_ENV === 'production' && process.env.FORCE_SECURE_COOKIE !== 'false', // Ensure HTTPS
         httpOnly: true, // Prevent access to cookies via JavaScript
+        sameSite: 'Lax', // Prevent CSRF while allowing cross-origin credentials
         maxAge: 1000 * 60 * 60 * 24 // 1 day in milliseconds
     }
 }));
