@@ -18,7 +18,7 @@ app.post('/api/generate-video', async (req, res) => {
 
     try {
         const job = await videoQueue.add({ prompt, email });
-        res.json({ message: 'Your video is being processed. You will receive an email shortly (we use the email tied to your Spotify account!).', jobId: job.id });
+        res.json({ message: 'Your video is being processed! You will receive an email in a few minutes (we use the email tied to your Spotify account!).', jobId: job.id });
     } catch (error) {
         console.error('Error adding job to queue:', error.message);
         res.status(500).json({ error: 'Failed to process your request.' });
