@@ -65,7 +65,7 @@ app.get('/', (req, res) => {
 // Redirect to Spotify's authorization page
 app.get('/login', (req, res) => {
     const scope = 'user-read-email user-read-private user-top-read'; 
-    const redirectUri = encodeURIComponent(REDIRECT_URI); // Ensure the redirect URI is encoded
+    const redirectUri = encodeURIComponent(REDIRECT_URI);
     const fallbackUrl = `https://accounts.spotify.com/authorize?${querystring.stringify({
         response_type: 'code',
         client_id: CLIENT_ID,
@@ -73,22 +73,30 @@ app.get('/login', (req, res) => {
         redirect_uri: REDIRECT_URI,
     })}`;
 
-    const spotifyAppUrl = `intent://accounts.spotify.com/inapp-authorize?${querystring.stringify({
+    const iosSpotifyUrl = `spotify://authorize?${querystring.stringify({
+        response_type: 'code',
+        client_id: CLIENT_ID,
+        scope: scope,
+        redirect_uri: REDIRECT_URI,
+    })}`;
+
+    const androidSpotifyUrl = `intent://accounts.spotify.com/inapp-authorize?${querystring.stringify({
         response_type: 'code',
         client_id: CLIENT_ID,
         scope: scope,
         redirect_uri: REDIRECT_URI,
     })}#Intent;scheme=https;package=com.spotify.music;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
 
-    // Check user-agent to determine if the user is on mobile
+    // Detect platform
     const userAgent = req.headers['user-agent'];
-    const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
+    const isIOS = /iphone|ipad|ipod/i.test(userAgent);
+    const isAndroid = /android/i.test(userAgent);
 
-    if (isMobile) {
-        // Redirect to Spotify app intent for mobile users
-        res.redirect(spotifyAppUrl);
+    if (isIOS) {
+        res.redirect(iosSpotifyUrl);
+    } else if (isAndroid) {
+        res.redirect(androidSpotifyUrl);
     } else {
-        // Redirect to the web-based Spotify auth flow for desktop users
         res.redirect(fallbackUrl);
     }
 });
