@@ -413,21 +413,6 @@ app.post('/api/clear-queue', async (req, res) => {
     }
 });
 
-// Get queue status
-app.get('/api/queue-status', async (req, res) => {
-    try {
-        const counts = await videoQueue.getJobCounts();
-        res.json({
-            counts,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error('Error getting queue status:', error);
-        res.status(500).json({ error: 'Failed to get queue status' });
-    }
-});
-
-
 app.get('/videos/:fileName', (req, res) => {
     const filePath = path.join(__dirname, 'videos', req.params.fileName);
     
